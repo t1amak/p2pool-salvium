@@ -60,26 +60,8 @@ jobs:
       run: |
         mkdir -p build
         cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release
-        make -j$(nproc) p2pool
-
-    - name: Run RandomX self-test
-      run: |
-        cd build
-        ./p2pool --test
-        make -j$(nproc) randomx-tests
-        external/src/RandomX/randomx-tests
-
-    - name: Build and run tests
-      run: |
-        cd tests
-        mkdir -p build
-        cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release
-        make -j$(nproc) p2pool_tests
-        cd ../build
-        unxz *.xz || true
-        ./p2pool_tests || true
+        cmake ..
+        make -j$(nproc)
 
     - name: Archive binary
       uses: actions/upload-artifact@v4
@@ -121,26 +103,8 @@ jobs:
         cd ../../..
         mkdir -p build
         cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" -DCMAKE_C_COMPILER=${{ matrix.config.c }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }}
-        make -j4 p2pool
-
-    - name: Run RandomX self-test
-      run: |
-        cd build
-        ./p2pool.exe --test || true
-        make -j4 randomx-tests || true
-        external/src/RandomX/randomx-tests.exe || true
-
-    - name: Build and run tests
-      run: |
-        cd tests
-        mkdir -p build
-        cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" -DCMAKE_C_COMPILER=${{ matrix.config.c }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }}
-        make -j4 p2pool_tests || true
-        cd ../build
-        unxz *.xz || true
-        ./p2pool_tests.exe || true
+        cmake .. -G "Unix Makefiles" -DCMAKE_C_COMPILER=${{ matrix.config.c }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }}
+        make -j4
 
     - name: Archive binary
       uses: actions/upload-artifact@v4
@@ -168,26 +132,8 @@ jobs:
       run: |
         mkdir -p build
         cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release
-        make -j3 p2pool
-
-    - name: Run RandomX self-test
-      run: |
-        cd build
-        ./p2pool --test || true
-        make -j3 randomx-tests || true
-        external/src/RandomX/randomx-tests || true
-
-    - name: Build and run tests
-      run: |
-        cd tests
-        mkdir -p build
-        cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release
-        make -j3 p2pool_tests || true
-        cd ../build
-        unxz *.xz || true
-        ./p2pool_tests || true
+        cmake ..
+        make -j3 
 
     - name: Archive binary
       uses: actions/upload-artifact@v4

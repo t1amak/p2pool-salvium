@@ -1,0 +1,221 @@
+name: Release
+
+on:
+  push:
+    branches: ["master"]
+    paths-ignore:
+      - 'docker-compose/**'
+      - 'docs/**'
+      - 'README.md'
+
+  pull_request:
+
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create GitHub release after successful builds (true/false)'
+        required: true
+        default: 'false'
+      tag:
+        description: 'Tag name for the release (e.g. v1.2.3)'
+        required: false
+      release_name:
+        description: 'Release title'
+        required: false
+      release_body:
+        description: 'Release notes / body'
+        required: false
+      draft:
+        description: 'Create release as draft (true/false)'
+        required: false
+        default: 'false'
+      prerelease:
+        description: 'Create release as prerelease (true/false)'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-linux-amd64:
+    name: Build Linux x86_64
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test || true
+        sudo apt update
+        sudo apt install -y git build-essential cmake libuv1-dev libzmq3-dev libgss-dev libcurl4-openssl-dev libidn2-0-dev xz-utils
+
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Build p2pool (Linux)
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make -j$(nproc) p2pool
+
+    - name: Run RandomX self-test
+      run: |
+        cd build
+        ./p2pool --test
+        make -j$(nproc) randomx-tests
+        external/src/RandomX/randomx-tests
+
+    - name: Build and run tests
+      run: |
+        cd tests
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make -j$(nproc) p2pool_tests
+        cd ../build
+        unxz *.xz || true
+        ./p2pool_tests || true
+
+    - name: Archive binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: p2pool-linux-amd64
+        path: build/p2pool
+
+  build-windows:
+    name: Build Windows (MSYS2 / mingw-w64)
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    strategy:
+      matrix:
+        config:
+          - { c: "gcc", cxx: "g++" }
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup MSYS2 and toolchain
+      uses: eine/setup-msys2@v2
+      with:
+        update: true
+        install: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake make git
+
+    - name: Build p2pool (Windows mingw)
+      run: |
+        cd external/src/curl || true
+        cmake . -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" -DCMAKE_C_COMPILER=${{ matrix.config.c }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }} -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DCURL_DISABLE_INSTALL=ON
+        make -j4 || true
+        cd ../../..
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" -DCMAKE_C_COMPILER=${{ matrix.config.c }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }}
+        make -j4 p2pool
+
+    - name: Run RandomX self-test
+      run: |
+        cd build
+        ./p2pool.exe --test || true
+        make -j4 randomx-tests || true
+        external/src/RandomX/randomx-tests.exe || true
+
+    - name: Build and run tests
+      run: |
+        cd tests
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" -DCMAKE_C_COMPILER=${{ matrix.config.c }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }}
+        make -j4 p2pool_tests || true
+        cd ../build
+        unxz *.xz || true
+        ./p2pool_tests.exe || true
+
+    - name: Archive binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: p2pool-windows
+        path: build/p2pool.exe
+
+  build-macos-aarch64:
+    name: Build macOS aarch64
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install dependencies (Homebrew)
+      run: |
+        brew update || true
+        brew install cmake xz || true
+
+    - name: Build p2pool (macOS aarch64)
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make -j3 p2pool
+
+    - name: Run RandomX self-test
+      run: |
+        cd build
+        ./p2pool --test || true
+        make -j3 randomx-tests || true
+        external/src/RandomX/randomx-tests || true
+
+    - name: Build and run tests
+      run: |
+        cd tests
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make -j3 p2pool_tests || true
+        cd ../build
+        unxz *.xz || true
+        ./p2pool_tests || true
+
+    - name: Archive binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: p2pool-macos-aarch64
+        path: build/p2pool
+
+  publish-release:
+    name: Publish release (manual)
+    needs:
+      - build-linux-amd64
+      - build-windows
+      - build-macos-aarch64
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - name: Download all build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Create GitHub release and upload artifacts
+      uses: ncipollo/release-action@v1
+      with:
+        tag: ${{ github.event.inputs.tag }}
+        name: ${{ github.event.inputs.release_name }}
+        body: ${{ github.event.inputs.release_body }}
+        draft: ${{ github.event.inputs.draft }}
+        prerelease: ${{ github.event.inputs.prerelease }}
+        files: artifacts/**

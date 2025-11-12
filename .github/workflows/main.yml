@@ -114,7 +114,7 @@ jobs:
 
   build-macos-aarch64:
     name: Build macOS aarch64
-    runs-on: macos-15
+    runs-on: macos-latest
     timeout-minutes: 45
 
     steps:
@@ -126,7 +126,7 @@ jobs:
     - name: Install dependencies (Homebrew)
       run: |
         brew update || true
-        brew install cmake xz || true
+        brew install cmake xz git libuv zmq zeromq libpgm curl || true
 
     - name: Build p2pool (macOS aarch64)
       run: |

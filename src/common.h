@@ -117,7 +117,7 @@ extern "C" void __nss_module_disable_loading();
 namespace p2pool {
 
 constexpr size_t HASH_SIZE = 32;
-constexpr uint8_t HARDFORK_SUPPORTED_VERSION = 16;
+constexpr uint8_t HARDFORK_SUPPORTED_VERSION = 10;
 constexpr uint8_t MINER_REWARD_UNLOCK_TIME = 60;
 constexpr uint8_t NONCE_SIZE = 4;
 constexpr uint8_t EXTRA_NONCE_SIZE = 4;

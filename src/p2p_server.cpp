@@ -48,7 +48,7 @@ LOG_CATEGORY(P2PServer)
 
 static constexpr char saved_peer_list_file_name[] = "p2pool_peers.txt";
 static constexpr char saved_onion_peer_list_file_name[] = "p2pool_onion_peers.txt";
-static const char* seed_nodes[] = { "" };
+static const char* seed_nodes[] = { "p2pool-seed01.whiskymine.io" };
 static const char* seed_nodes_mini[] = { "" };
 static const char* seed_nodes_nano[] = { "" };
 

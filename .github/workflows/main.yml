@@ -93,7 +93,7 @@ jobs:
       uses: eine/setup-msys2@v2
       with:
         update: true
-        install: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake make git
+        install: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-nasm make git
 
     - name: Build p2pool (Windows mingw)
       run: |

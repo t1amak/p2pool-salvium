@@ -1,0 +1,71 @@
+name: Build Releases
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Tag or commit to build (e.g. v4.9)'
+        required: false
+        default: ''
+
+jobs:
+  release-packages:
+    name: Build Linux/macOS/Windows archives
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+    env:
+      P2POOL_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Ensure version is provided
+        shell: bash
+        run: |
+          if [ -z "${P2POOL_VERSION}" ]; then
+            echo "P2POOL_VERSION is empty. Trigger the workflow from a tag or provide the version input."
+            exit 1
+          fi
+
+      - name: Build base toolchain image
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd scripts/release/images/ubuntu
+          ./build.sh
+
+      - name: Build Linux x64 release
+        shell: bash
+        run: scripts/release/linux_x64/build.sh "${P2POOL_VERSION}"
+
+      - name: Build macOS x64 release
+        shell: bash
+        run: scripts/release/macos_x64/build.sh "${P2POOL_VERSION}"
+
+      - name: Build Windows x64 release
+        shell: bash
+        run: scripts/release/windows_x64/build.sh "${P2POOL_VERSION}"
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd scripts/release
+          ./gen_sums.sh
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2pool-${{ env.P2POOL_VERSION }}-releases
+          if-no-files-found: error
+          path: |
+            scripts/release/p2pool-${{ env.P2POOL_VERSION }}-linux-x64.tar.gz
+            scripts/release/p2pool-${{ env.P2POOL_VERSION }}-macos-x64.tar.gz
+            scripts/release/p2pool-${{ env.P2POOL_VERSION }}-windows-x64.zip
+            scripts/release/sha256sums.txt

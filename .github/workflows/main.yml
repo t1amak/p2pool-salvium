@@ -89,21 +89,59 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Setup MSYS2 and toolchain
+    - name: Setup MSYS2 and toolchain (install ZeroMQ and helpers)
       uses: eine/setup-msys2@v2
       with:
         update: true
-        install: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-nasm make git
+        install: >
+          mingw-w64-x86_64-toolchain
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-nasm
+          make
+          git
+          mingw-w64-x86_64-zeromq
+          mingw-w64-x86_64-cppzmq
+          mingw-w64-x86_64-curl
 
     - name: Build p2pool (Windows mingw)
       run: |
+        set -e
+
         cd external/src/curl || true
-        cmake . -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" -DCMAKE_C_COMPILER=${{ matrix.config.c }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }} -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DCURL_DISABLE_INSTALL=ON
+        cmake . -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" \
+          -DCMAKE_C_COMPILER=${{ matrix.config.c }} \
+          -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }} \
+          -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DCURL_DISABLE_INSTALL=ON
         make -j4 || true
         cd ../../..
+
+        if [ ! -f external/src/libzmq/build/lib/libzmq.a ]; then
+          echo "Building libzmq from external/src/libzmq as fallback..."
+          cd external/src/libzmq || true
+          mkdir -p build
+          cd build
+          cmake .. -G "Unix Makefiles" \
+            -DCMAKE_C_COMPILER=${{ matrix.config.c }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }} \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DWITH_LIBSODIUM=OFF || true
+          make -j4 || true
+          cd ../../..
+        else
+          echo "Found external built libzmq"
+        fi
+
         mkdir -p build
         cd build
-        cmake .. -G "Unix Makefiles" -DCMAKE_C_COMPILER=${{ matrix.config.c }} -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }}
+        cmake .. -G "Unix Makefiles" \
+          -DCMAKE_C_COMPILER=${{ matrix.config.c }} \
+          -DCMAKE_CXX_COMPILER=${{ matrix.config.cxx }} \
+          -DZMQ_INCLUDE_DIR=/mingw64/include \
+          -DZMQ_LIBRARY=/mingw64/lib/libzmq.a \
+          -DZMQ_LIBRARY_DEBUG=${GITHUB_WORKSPACE}/external/src/libzmq/build/lib/libzmq.a \
+          -DCURL_LIBRARY=${GITHUB_WORKSPACE}/external/src/curl/lib/libcurl.a \
+          -DCURL_LIBRARY_DEBUG=${GITHUB_WORKSPACE}/external/src/curl/lib/libcurl-d.a || true
+
         make -j4
 
     - name: Archive binary
@@ -111,6 +149,7 @@ jobs:
       with:
         name: p2pool-windows
         path: build/p2pool.exe
+
 
   build-macos-aarch64:
     name: Build macOS aarch64

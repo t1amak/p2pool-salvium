@@ -23,6 +23,7 @@
 #include "keccak.h"
 #include "crypto.h"
 #include <ios>
+#include <inttypes.h>
 
 extern "C" {
 #include "crypto-ops.h"
@@ -178,7 +179,7 @@ bool Wallet::decode(const char* address)
         }
 
         char hex_buf[32];
-        snprintf(hex_buf, sizeof(hex_buf), "0x%lx", tag);
+		snprintf(hex_buf, sizeof(hex_buf), "0x%" PRIx64, tag);
 
         m_prefix = tag;
 

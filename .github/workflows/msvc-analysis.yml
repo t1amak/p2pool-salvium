@@ -10,7 +10,7 @@ name: Microsoft C++ Code Analysis
 
 on:
   push:
-    branches: ["master"]
+    branches: ["main"]
     paths-ignore:
       - 'docker-compose/**'
       - 'docs/**'

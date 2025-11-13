@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 
 repo_root="$(cd ../../.. && pwd)"
 
-if [ "$2" ]; then
+if [ "${2:-}" ]; then
 	cpu_set="--cpuset-cpus $2"
 else
 	cpu_set=""

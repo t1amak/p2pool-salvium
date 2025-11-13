@@ -19,7 +19,38 @@ flags_datetime="-D__DATE__=\"\\\"$CURRENT_DATE\\\"\" -D__TIME__=\"\\\"$CURRENT_T
 flags_libs="-Os -flto -w $flags_size $flags_datetime"
 flags_p2pool="$flags_size $flags_datetime"
 
-sdk_sysroot="$(/usr/local/bin/x86_64-apple-darwin25-clang -print-sysroot)"
+clang_bin="$(command -v x86_64-apple-darwin25-clang || true)"
+if [ -z "$clang_bin" ]; then
+	echo "x86_64-apple-darwin25-clang not found in PATH" >&2
+	exit 1
+fi
+
+find_macos_sdk() {
+	if [ -n "${SDKROOT:-}" ] && [ -d "${SDKROOT:-}" ]; then
+		echo "$SDKROOT"
+		return 0
+	fi
+
+	for base in /usr/local/target/SDK /usr/local/osxcross/target/SDK /osxcross/target/SDK; do
+		if [ -d "$base" ]; then
+			for candidate in "$base"/MacOSX*.sdk; do
+				if [ -d "$candidate" ]; then
+					echo "$candidate"
+					return 0
+				fi
+			done
+		fi
+	done
+
+	find /usr/local -maxdepth 4 -name 'MacOSX*.sdk' -type d 2>/dev/null | head -n 1
+}
+
+sdk_sysroot="$(find_macos_sdk)"
+if [ -z "$sdk_sysroot" ]; then
+	echo "Unable to locate macOS SDK sysroot. Set SDKROOT to the SDK path." >&2
+	exit 1
+fi
+
 export SDKROOT="$sdk_sysroot"
 cmake_osx_args="-DCMAKE_OSX_SYSROOT=$sdk_sysroot -DCMAKE_SYSROOT=$sdk_sysroot -DCMAKE_SYSTEM_FRAMEWORK_PATH=$sdk_sysroot/System/Library/Frameworks"
 

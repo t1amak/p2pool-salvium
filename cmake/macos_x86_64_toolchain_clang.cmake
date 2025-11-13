@@ -9,13 +9,24 @@ set(CMAKE_ASM_COMPILER /usr/local/bin/x86_64-apple-darwin25-as)
 set(CMAKE_STRIP /usr/local/bin/x86_64-apple-darwin25-strip)
 
 if(NOT DEFINED CMAKE_OSX_SYSROOT)
-execute_process(
-		COMMAND ${CMAKE_C_COMPILER} -print-sysroot
-		OUTPUT_VARIABLE _OSX_SYSROOT
-		OUTPUT_STRIP_TRAILING_WHITESPACE
-	)
-	set(CMAKE_OSX_SYSROOT "${_OSX_SYSROOT}")
+	if(DEFINED ENV{SDKROOT} AND IS_DIRECTORY "$ENV{SDKROOT}")
+		set(CMAKE_OSX_SYSROOT "$ENV{SDKROOT}")
+	else()
+		foreach(_sdk_root "/usr/local/target/SDK" "/usr/local/osxcross/target/SDK" "/osxcross/target/SDK")
+			if(IS_DIRECTORY "${_sdk_root}")
+				file(GLOB _sdk_candidates "${_sdk_root}/MacOSX*.sdk")
+				list(SORT _sdk_candidates)
+				list(REVERSE _sdk_candidates)
+				if(_sdk_candidates)
+					list(GET _sdk_candidates 0 CMAKE_OSX_SYSROOT)
+					break()
+				endif()
+			endif()
+		endforeach()
+	endif()
 endif()
 
-set(CMAKE_SYSROOT "${CMAKE_OSX_SYSROOT}")
-set(CMAKE_SYSTEM_FRAMEWORK_PATH "${CMAKE_OSX_SYSROOT}/System/Library/Frameworks")
+if(DEFINED CMAKE_OSX_SYSROOT AND CMAKE_OSX_SYSROOT)
+	set(CMAKE_SYSROOT "${CMAKE_OSX_SYSROOT}")
+	set(CMAKE_SYSTEM_FRAMEWORK_PATH "${CMAKE_OSX_SYSROOT}/System/Library/Frameworks")
+endif()

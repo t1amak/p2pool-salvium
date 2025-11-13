@@ -1,0 +1,13 @@
+prefix=/home/p2pool/p2pool-salvium/install
+exec_prefix=/home/p2pool/p2pool-salvium/install
+libdir=/home/p2pool/p2pool-salvium/install/lib
+sharedlibdir=/home/p2pool/p2pool-salvium/install/lib
+includedir=/home/p2pool/p2pool-salvium/install/include
+
+Name: zlib
+Description: zlib compression library
+Version: 1.3.1.1
+
+Requires:
+Libs: -L${libdir} -L${sharedlibdir} -lz
+Cflags: -I${includedir}

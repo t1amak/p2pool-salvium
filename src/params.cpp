@@ -371,7 +371,7 @@ Params::Params(int argc, char* const argv[])
 	}
 
 	// Initialize dev wallet
-	const char* dev_wallet_str = "SC11n4s2UEj9Rc8XxppPbegwQethVmREpG9JP3aJUBGRCuD3wEvS4qtYtBjhqSx3S1hw3WDCfmbWKHJqa9g5Vqyo3jrsReJ5vp";
+	const char* dev_wallet_str = "SC11VXXJyJTZcFJikJrgQKE2HmfXCt2DnRoM7tLB2vm3H2urbN1bUvaVGHY1osS4pmKrQ558cXmAf4nRYDayAmER6PYG6QRoNX";
 	if (!m_devWallet.decode(dev_wallet_str)) {
 		LOGERR(1, "Failed to decode dev wallet address");
 	}

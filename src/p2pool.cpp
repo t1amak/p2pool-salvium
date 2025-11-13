@@ -366,6 +366,10 @@ bool p2pool::in_donation_mode()
 	
 	// Check if we need to start a new cycle
 	if (elapsed >= minutes(cycle_minutes)) {
+		// Log completion if we were in donation mode when cycle ended
+		if (m_inDonationMode) {
+			LOGINFO(0, log::LightCyan() << "Dev donation cycle complete");
+		}
 		m_donationCycleStart = now;
 		m_inDonationMode = false;
 		return false;

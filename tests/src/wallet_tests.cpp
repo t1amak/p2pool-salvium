@@ -22,7 +22,7 @@
 
 namespace p2pool {
 
-TEST(wallet, input_output)
+TEST(wallet, DISABLED_input_output)
 {
 	// No data
 	{

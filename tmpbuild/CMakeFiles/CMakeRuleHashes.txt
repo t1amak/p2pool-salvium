@@ -1,2 +1,0 @@
-# Hashes of file build rules.
-bc7b2526a206051ea3982fecbde1f9f6 external/src/grpc/CMakeFiles/tools

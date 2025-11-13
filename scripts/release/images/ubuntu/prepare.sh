@@ -68,7 +68,10 @@ git apply --verbose --ignore-whitespace clang_version.patch
 
 mkdir build
 cd build
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
+cmake -G Ninja \
+  -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_CXX_COMPILER=clang++ \
+  -DCMAKE_BUILD_TYPE=Release \
   -DLLVM_ENABLE_PROJECTS="clang;lld;libc" \
   -DLLVM_APPEND_VC_REV=OFF \
   -DLLVM_VERSION_SUFFIX="_p2pool" \

@@ -1,0 +1,236 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'v4.12'
+        required: true
+        type: string
+
+jobs:
+  build-linux-x64:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Build static binary
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential cmake
+        cd external/src/curl
+        cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DCURL_DISABLE_INSTALL=ON -DHTTP_ONLY=ON -DCURL_ENABLE_SSL=OFF
+        make -j$(nproc)
+        cd ../../..
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DSTATIC_BINARY=ON -DWITH_LTO=OFF
+        make -j$(nproc)
+        strip p2pool-salvium
+    
+    - name: Package
+      run: |
+        cd build
+        tar -czf p2pool-salvium-v${{ inputs.version }}-linux-x64.tar.gz p2pool-salvium
+    
+    - uses: actions/upload-artifact@v4
+      with:
+        name: linux-x64
+        path: build/p2pool-salvium-v${{ inputs.version }}-linux-x64.tar.gz
+
+  build-linux-aarch64:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: jirutka/setup-alpine@v1
+      with:
+        arch: aarch64
+        branch: latest-stable
+    
+    - name: Install dependencies and build
+      shell: alpine.sh {0}
+      run: |
+        apk add git cmake gcc g++ make linux-headers xz
+    
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Build
+      shell: alpine.sh {0}
+      run: |
+        cd external/src/curl
+        cmake . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-Os -flto=auto" -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DCURL_DISABLE_INSTALL=ON -DHTTP_ONLY=ON -DCURL_ENABLE_SSL=OFF
+        make -j$(nproc)
+        cd ../../..
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DSTATIC_BINARY=ON -DWITH_LTO=OFF
+        make -j$(nproc)
+        strip p2pool-salvium
+        tar -czf p2pool-salvium-v${{ inputs.version }}-linux-aarch64.tar.gz p2pool-salvium
+    
+    - uses: actions/upload-artifact@v4
+      with:
+        name: linux-aarch64
+        path: build/p2pool-salvium-v${{ inputs.version }}-linux-aarch64.tar.gz
+
+  build-linux-riscv64:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: jirutka/setup-alpine@v1
+      with:
+        arch: riscv64
+        branch: latest-stable
+    
+    - name: Install dependencies
+      shell: alpine.sh --root {0}
+      run: apk add git cmake gcc g++ make linux-headers xz
+    
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Build
+      shell: alpine.sh {0}
+      run: |
+        cd external/src/curl
+        cmake . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-Os" -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DCURL_DISABLE_INSTALL=ON -DHTTP_ONLY=ON -DCURL_ENABLE_SSL=OFF
+        make -j$(nproc)
+        cd ../../..
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DSTATIC_BINARY=ON -DWITH_LTO=OFF
+        make -j$(nproc)
+        strip p2pool-salvium
+        tar -czf p2pool-salvium-v${{ inputs.version }}-linux-riscv64.tar.gz p2pool-salvium
+    
+    - uses: actions/upload-artifact@v4
+      with:
+        name: linux-riscv64
+        path: build/p2pool-salvium-v${{ inputs.version }}-linux-riscv64.tar.gz
+
+  build-macos-x64:
+    runs-on: macos-13
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Build
+      run: |
+        brew install cmake
+        cd external/src/curl
+        cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DCURL_DISABLE_INSTALL=ON -DHTTP_ONLY=ON -DCURL_ENABLE_SSL=OFF
+        make -j$(sysctl -n hw.ncpu)
+        cd ../../..
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make -j$(sysctl -n hw.ncpu)
+        strip p2pool-salvium
+        tar -czf p2pool-salvium-v${{ inputs.version }}-macos-x64.tar.gz p2pool-salvium
+    
+    - uses: actions/upload-artifact@v4
+      with:
+        name: macos-x64
+        path: build/p2pool-salvium-v${{ inputs.version }}-macos-x64.tar.gz
+
+  build-macos-aarch64:
+    runs-on: macos-14
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Build
+      run: |
+        brew install cmake
+        cd external/src/curl
+        cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DCURL_DISABLE_INSTALL=ON -DHTTP_ONLY=ON -DCURL_ENABLE_SSL=OFF
+        make -j$(sysctl -n hw.ncpu)
+        cd ../../..
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make -j$(sysctl -n hw.ncpu)
+        strip p2pool-salvium
+        tar -czf p2pool-salvium-v${{ inputs.version }}-macos-aarch64.tar.gz p2pool-salvium
+    
+    - uses: actions/upload-artifact@v4
+      with:
+        name: macos-aarch64
+        path: build/p2pool-salvium-v${{ inputs.version }}-macos-aarch64.tar.gz
+
+  build-windows-x64:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: git make mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake
+    
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Build
+      run: |
+        cd external/src/curl
+        cmake . -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DCURL_DISABLE_INSTALL=ON -DHTTP_ONLY=ON -DCURL_ENABLE_SSL=OFF
+        make -j$(nproc)
+        cd ../../..
+        mkdir build && cd build
+        cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
+        make -j$(nproc)
+        strip p2pool-salvium.exe
+        zip p2pool-salvium-v${{ inputs.version }}-windows-x64.zip p2pool-salvium.exe
+    
+    - uses: actions/upload-artifact@v4
+      with:
+        name: windows-x64
+        path: build/p2pool-salvium-v${{ inputs.version }}-windows-x64.zip
+
+  create-checksums:
+    needs: [build-linux-x64, build-linux-aarch64, build-linux-riscv64, build-macos-x64, build-macos-aarch64, build-windows-x64]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+    
+    - name: Create source archive
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Package source
+      run: |
+        cd ..
+        tar --exclude='.git' -cJf p2pool-salvium_source-v${{ inputs.version }}.tar.xz p2pool-salvium
+        mv p2pool-salvium_source-v${{ inputs.version }}.tar.xz p2pool-salvium/
+    
+    - name: Generate checksums
+      run: |
+        cd artifacts
+        find . -name "*.tar.gz" -o -name "*.zip" | while read file; do
+          sha256sum "$file" >> ../sha256sums.txt
+        done
+        cd ..
+        sha256sum p2pool-salvium_source-v${{ inputs.version }}.tar.xz >> sha256sums.txt
+        # Clean up paths in checksum file
+        sed -i 's|\.\/[^/]*\/||g' sha256sums.txt
+    
+    - name: Move all files to release directory
+      run: |
+        mkdir release
+        find artifacts -name "*.tar.gz" -exec mv {} release/ \;
+        find artifacts -name "*.zip" -exec mv {} release/ \;
+        mv p2pool-salvium_source-v${{ inputs.version }}.tar.xz release/
+        mv sha256sums.txt release/
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: release-files
+        path: release/
+

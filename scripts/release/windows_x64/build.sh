@@ -1,4 +1,5 @@
 #!/bin/sh
+set -eu
 
 # Example usage: ./build.sh v4.9
 

@@ -19,7 +19,7 @@ flags_datetime="-D__DATE__=\"\\\"$CURRENT_DATE\\\"\" -D__TIME__=\"\\\"$CURRENT_T
 flags_libs="-Os -flto -w $flags_size $flags_datetime"
 flags_p2pool="$flags_size $flags_datetime"
 
-sdk_sysroot="$(/usr/local/bin/x86_64-apple-darwin25-clang --print-sysroot)"
+sdk_sysroot="$(/usr/local/bin/x86_64-apple-darwin25-clang -print-sysroot)"
 export SDKROOT="$sdk_sysroot"
 cmake_osx_args="-DCMAKE_OSX_SYSROOT=$sdk_sysroot -DCMAKE_SYSROOT=$sdk_sysroot -DCMAKE_SYSTEM_FRAMEWORK_PATH=$sdk_sysroot/System/Library/Frameworks"
 

@@ -16,10 +16,12 @@ TOUCH_DATE=$(date -u -d @$BUILD_TIMESTAMP +"%Y%m%d%H%M.%S")
 flags_size="-ffunction-sections -fdata-sections -Wl,-s -Wl,--gc-sections"
 flags_datetime="-D__DATE__=\"\\\"$CURRENT_DATE\\\"\" -D__TIME__=\"\\\"$CURRENT_TIME\\\"\" -Wno-builtin-macro-redefined"
 
-flags_libs="--target=x86_64-pc-windows-gnu -Os -flto -Wl,/timestamp:$BUILD_TIMESTAMP -fuse-ld=lld -w $flags_size $flags_datetime"
+MINGW_SYSROOT="$(x86_64-w64-mingw32-g++ -print-sysroot)"
+flags_sysroot="--sysroot=$MINGW_SYSROOT"
 
-flags_p2pool="--target=x86_64-pc-windows-gnu -Wl,/timestamp:$BUILD_TIMESTAMP -fuse-ld=lld -femulated-tls -Wno-unused-command-line-argument -Wno-unknown-attributes $flags_size $flags_datetime"
-flags_cxx_headers="-isystem /usr/local/x86_64-w64-mingw32/include/c++ -isystem /usr/local/x86_64-w64-mingw32/include/c++/15.2.0 -isystem /usr/local/x86_64-w64-mingw32/include"
+flags_libs="--target=x86_64-pc-windows-gnu $flags_sysroot -Os -flto -Wl,/timestamp:$BUILD_TIMESTAMP -fuse-ld=lld -w $flags_size $flags_datetime"
+
+flags_p2pool="--target=x86_64-pc-windows-gnu $flags_sysroot -Wl,/timestamp:$BUILD_TIMESTAMP -fuse-ld=lld -femulated-tls -Wno-unused-command-line-argument -Wno-unknown-attributes $flags_size $flags_datetime"
 
 cd /p2pool
 git apply --verbose --ignore-whitespace --directory=external/src/grpc/third_party/boringssl-with-bazel patches/boringssl/win7.patch
@@ -42,7 +44,7 @@ make -j$(nproc)
 
 cd /p2pool
 mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM="3.5" -DCMAKE_TOOLCHAIN_FILE=../cmake/windows_x86_64_toolchain_clang.cmake -DCMAKE_C_FLAGS="$flags_p2pool" -DCMAKE_CXX_FLAGS="$flags_p2pool $flags_cxx_headers" -DOPENSSL_NO_ASM=ON -DSTATIC_BINARY=ON -DARCH_ID=x86_64 -DGIT_COMMIT="$(git rev-parse --short=7 HEAD)"
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM="3.5" -DCMAKE_TOOLCHAIN_FILE=../cmake/windows_x86_64_toolchain_clang.cmake -DCMAKE_C_FLAGS="$flags_p2pool" -DCMAKE_CXX_FLAGS="$flags_p2pool" -DOPENSSL_NO_ASM=ON -DSTATIC_BINARY=ON -DARCH_ID=x86_64 -DGIT_COMMIT="$(git rev-parse --short=7 HEAD)"
 make -j$(nproc) p2pool
 
 mkdir $1

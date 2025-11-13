@@ -14,7 +14,7 @@ on:
 jobs:
   release-packages:
     name: Build Linux/macOS/Windows archives
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 360
     env:
       P2POOL_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
@@ -44,9 +44,9 @@ jobs:
         shell: bash
         run: scripts/release/linux_x64/build.sh "${P2POOL_VERSION}"
 
-      - name: Build macOS x64 release
+      - name: Build macOS aarch64 release
         shell: bash
-        run: scripts/release/macos_x64/build.sh "${P2POOL_VERSION}"
+        run: scripts/release/macos_aarch64/build.sh "${P2POOL_VERSION}"
 
       - name: Build Windows x64 release
         shell: bash
@@ -66,6 +66,6 @@ jobs:
           if-no-files-found: error
           path: |
             scripts/release/p2pool-${{ env.P2POOL_VERSION }}-linux-x64.tar.gz
-            scripts/release/p2pool-${{ env.P2POOL_VERSION }}-macos-x64.tar.gz
+            scripts/release/p2pool-${{ env.P2POOL_VERSION }}-macos-aarch64.tar.gz
             scripts/release/p2pool-${{ env.P2POOL_VERSION }}-windows-x64.zip
             scripts/release/sha256sums.txt

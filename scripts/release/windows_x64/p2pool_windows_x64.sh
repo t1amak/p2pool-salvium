@@ -34,20 +34,38 @@ if [ -z "$MINGW_SYSROOT" ]; then
 fi
 
 flags_sysroot=""
+LIBGCC_DIR=""
+
 if [ -n "$MINGW_SYSROOT" ]; then
 	flags_sysroot="--sysroot=$MINGW_SYSROOT"
 	# Fix mingw-w64 headers for clang: skip redefining __cpuidex when clang
 	# already provides one via its cpuid.h.
 	if [ -f "$PATCH_DIR/mingw/clang-cpuidex.patch" ] && [ -d "$MINGW_SYSROOT/include" ]; then
 		cd "$MINGW_SYSROOT"
-		patch -N -p1 < "$PATCH_DIR/mingw/clang-cpuidex.patch" || true
+		patch --follow-symlinks -N -p1 < "$PATCH_DIR/mingw/clang-cpuidex.patch" || true
 		cd /p2pool
 	fi
+
+	if [ -x "$MINGW_SYSROOT/bin/x86_64-w64-mingw32-g++" ]; then
+		MINGW_LIBGCC="$("$MINGW_SYSROOT/bin/x86_64-w64-mingw32-g++" --print-libgcc-file-name 2>/dev/null || true)"
+	fi
+fi
+
+if [ -z "$MINGW_LIBGCC" ] && command -v x86_64-w64-mingw32-g++ >/dev/null 2>&1; then
+	MINGW_LIBGCC="$(x86_64-w64-mingw32-g++ --print-libgcc-file-name 2>/dev/null || true)"
+fi
+if [ -n "$MINGW_LIBGCC" ]; then
+	LIBGCC_DIR="$(dirname "$MINGW_LIBGCC")"
 fi
 
 flags_libs="--target=x86_64-pc-windows-gnu $flags_sysroot -Os -flto -Wl,/timestamp:$BUILD_TIMESTAMP -fuse-ld=lld -w $flags_size $flags_datetime"
 
 flags_p2pool="--target=x86_64-pc-windows-gnu $flags_sysroot -Wl,/timestamp:$BUILD_TIMESTAMP -fuse-ld=lld -femulated-tls -Wno-unused-command-line-argument -Wno-unknown-attributes $flags_size $flags_datetime"
+
+if [ -n "$LIBGCC_DIR" ]; then
+	flags_libs="$flags_libs -L$LIBGCC_DIR"
+	flags_p2pool="$flags_p2pool -L$LIBGCC_DIR"
+fi
 
 cd /p2pool
 git apply --verbose --ignore-whitespace --directory=external/src/grpc/third_party/boringssl-with-bazel "$PATCH_DIR/boringssl/win7.patch"

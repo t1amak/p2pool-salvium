@@ -56,6 +56,7 @@ if [ -z "$MINGW_LIBGCC" ] && command -v x86_64-w64-mingw32-g++ >/dev/null 2>&1; 
 fi
 if [ -n "$MINGW_LIBGCC" ]; then
 	LIBGCC_DIR="$(dirname "$MINGW_LIBGCC")"
+	GCC_TOOLCHAIN="$LIBGCC_DIR"
 fi
 
 flags_libs="--target=x86_64-pc-windows-gnu $flags_sysroot -Os -flto -Wl,/timestamp:$BUILD_TIMESTAMP -fuse-ld=lld -w $flags_size $flags_datetime"
@@ -65,6 +66,11 @@ flags_p2pool="--target=x86_64-pc-windows-gnu $flags_sysroot -Wl,/timestamp:$BUIL
 if [ -n "$LIBGCC_DIR" ]; then
 	flags_libs="$flags_libs -L$LIBGCC_DIR"
 	flags_p2pool="$flags_p2pool -L$LIBGCC_DIR"
+fi
+
+if [ -n "$GCC_TOOLCHAIN" ]; then
+	flags_libs="--gcc-toolchain=$GCC_TOOLCHAIN $flags_libs"
+	flags_p2pool="--gcc-toolchain=$GCC_TOOLCHAIN $flags_p2pool"
 fi
 
 cd /p2pool

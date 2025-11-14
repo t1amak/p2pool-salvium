@@ -71,6 +71,16 @@ fi
 if [ -n "$GCC_TOOLCHAIN" ]; then
 	flags_libs="--gcc-toolchain=$GCC_TOOLCHAIN $flags_libs"
 	flags_p2pool="--gcc-toolchain=$GCC_TOOLCHAIN $flags_p2pool"
+	STDCPP_INC_BASE="$GCC_TOOLCHAIN/include/c++"
+	if [ -d "$STDCPP_INC_BASE" ]; then
+		flags_libs="$flags_libs -isystem $STDCPP_INC_BASE"
+		flags_p2pool="$flags_p2pool -isystem $STDCPP_INC_BASE"
+		TRIPLE_DIR="$(basename "$(dirname "$GCC_TOOLCHAIN")")"
+		if [ -n "$TRIPLE_DIR" ] && [ -d "$STDCPP_INC_BASE/$TRIPLE_DIR" ]; then
+			flags_libs="$flags_libs -isystem $STDCPP_INC_BASE/$TRIPLE_DIR"
+			flags_p2pool="$flags_p2pool -isystem $STDCPP_INC_BASE/$TRIPLE_DIR"
+		fi
+	fi
 fi
 
 cd /p2pool

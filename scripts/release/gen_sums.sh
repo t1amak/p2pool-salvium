@@ -17,18 +17,30 @@ format_size() {
 
 first=1
 
-for file in *.tar.gz *.zip *.tar.xz; do
-	size=$(stat -c %s "$file")
-	size_fmt=$(format_size "$size")
-	sha=$(sha256sum "$file" | awk '{print $1}')
+found_any=0
 
-	if [ $first -eq 0 ]; then
-		echo >> $OUTPUT_FILE
-	fi
+for pattern in "*.tar.gz" "*.zip" "*.tar.xz"; do
+	for file in $pattern; do
+		[ -e "$file" ] || continue
+		found_any=1
 
-	echo "Name: $file" >> $OUTPUT_FILE
-	echo "Size: $size_fmt" >> $OUTPUT_FILE
-	echo "SHA256: $sha" >> $OUTPUT_FILE
+		size=$(stat -c %s "$file")
+		size_fmt=$(format_size "$size")
+		sha=$(sha256sum "$file" | awk '{print $1}')
 
-	first=0
+		if [ $first -eq 0 ]; then
+			echo >> $OUTPUT_FILE
+		fi
+
+		echo "Name: $file" >> $OUTPUT_FILE
+		echo "Size: $size_fmt" >> $OUTPUT_FILE
+		echo "SHA256: $sha" >> $OUTPUT_FILE
+
+		first=0
+	done
 done
+
+if [ $found_any -eq 0 ]; then
+	echo "No release archives found to checksum." >&2
+	exit 1
+fi

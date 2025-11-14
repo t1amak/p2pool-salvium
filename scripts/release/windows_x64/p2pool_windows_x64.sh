@@ -23,15 +23,26 @@ TOUCH_DATE=$(date -u -d @$BUILD_TIMESTAMP +"%Y%m%d%H%M.%S")
 flags_size="-ffunction-sections -fdata-sections -Wl,-s -Wl,--gc-sections"
 flags_datetime="-D__DATE__=\"\\\"$CURRENT_DATE\\\"\" -D__TIME__=\"\\\"$CURRENT_TIME\\\"\" -Wno-builtin-macro-redefined"
 
-MINGW_SYSROOT="$(x86_64-w64-mingw32-g++ -print-sysroot)"
-flags_sysroot="--sysroot=$MINGW_SYSROOT"
+MINGW_SYSROOT="$(x86_64-w64-mingw32-g++ -print-sysroot 2>/dev/null || true)"
+if [ -z "$MINGW_SYSROOT" ]; then
+	for candidate in /usr/x86_64-w64-mingw32 /usr/local/x86_64-w64-mingw32; do
+		if [ -d "$candidate/include" ]; then
+			MINGW_SYSROOT="$candidate"
+			break
+		fi
+	done
+fi
 
-# Fix mingw-w64 headers for clang: skip redefining __cpuidex when clang already
-# provides one via its cpuid.h.
-if [ -f "$PATCH_DIR/mingw/clang-cpuidex.patch" ]; then
-	cd "$MINGW_SYSROOT"
-	patch -N -p1 < "$PATCH_DIR/mingw/clang-cpuidex.patch" || true
-	cd /p2pool
+flags_sysroot=""
+if [ -n "$MINGW_SYSROOT" ]; then
+	flags_sysroot="--sysroot=$MINGW_SYSROOT"
+	# Fix mingw-w64 headers for clang: skip redefining __cpuidex when clang
+	# already provides one via its cpuid.h.
+	if [ -f "$PATCH_DIR/mingw/clang-cpuidex.patch" ] && [ -d "$MINGW_SYSROOT/include" ]; then
+		cd "$MINGW_SYSROOT"
+		patch -N -p1 < "$PATCH_DIR/mingw/clang-cpuidex.patch" || true
+		cd /p2pool
+	fi
 fi
 
 flags_libs="--target=x86_64-pc-windows-gnu $flags_sysroot -Os -flto -Wl,/timestamp:$BUILD_TIMESTAMP -fuse-ld=lld -w $flags_size $flags_datetime"

@@ -48,9 +48,9 @@ LOG_CATEGORY(P2PServer)
 
 static constexpr char saved_peer_list_file_name[] = "p2pool_peers.txt";
 static constexpr char saved_onion_peer_list_file_name[] = "p2pool_onion_peers.txt";
-static const char* seed_nodes[] = { "p2pool-seed01.whiskymine.io" };
-static const char* seed_nodes_mini[] = { "" };
-static const char* seed_nodes_nano[] = { "" };
+static const char* seed_nodes[] = { "seed01.whiskymine.io", "seed02.whiskymine.io" };
+static const char* seed_nodes_mini[] = { "seed01.whiskymine.io", "seed02.whiskymine.io" };
+static const char* seed_nodes_nano[] = { "seed01.whiskymine.io", "seed02.whiskymine.io" };
 
 static constexpr int DEFAULT_BACKLOG = 16;
 static constexpr uint64_t DEFAULT_BAN_TIME = 600;
@@ -3162,7 +3162,7 @@ bool P2PServer::P2PClient::on_monero_block_broadcast(const uint8_t* buf, uint32_
 
 	const uint64_t header_and_miner_tx_size = static_cast<uint64_t>(data.header_size) + data.miner_tx_size;
 
-	if ((data.header_size < 43) || (data.header_size > 128) || (data.miner_tx_size < 64) || (header_and_miner_tx_size >= size)) {
+        if ((data.header_size < 43) || (data.header_size > 128) || (data.miner_tx_size < 40) || (header_and_miner_tx_size >= size)) {
 		LOGWARN(3, "Invalid MONERO_BLOCK_BROADCAST header: " << data.header_size << ", " << data.miner_tx_size << ", " << size);
 		return false;
 	}

@@ -28,7 +28,6 @@ namespace p2pool {
 
 static constexpr uint64_t MIN_STRATUM_BAN_TIME = UINT64_C(1);
 static constexpr uint64_t MAX_STRATUM_BAN_TIME = (UINT64_C(1) << 34) - 1;
-Wallet* Params::s_devFeeWallet = nullptr;
 
 Params::Params(int argc, char* const argv[])
 {
@@ -90,6 +89,15 @@ Params::Params(int argc, char* const argv[])
 				LOGERR(1, "Subaddress " << s << " failed to decode");
 			}
 
+			ok = true;
+		}
+
+		if ((strcmp(argv[i], "--donate-time") == 0) && (i + 1 < argc)) {
+			m_donateLevel = static_cast<uint32_t>(atoi(argv[++i]));
+			if (m_donateLevel < 1 || m_donateLevel > 50) {
+				LOGERR(1, "Invalid donate level " << m_donateLevel << ", must be 1-50");
+				m_donateLevel = 1;
+			}
 			ok = true;
 		}
 
@@ -346,6 +354,7 @@ Params::Params(int argc, char* const argv[])
 
 	char display_wallet_buf[Wallet::ADDRESS_LENGTH] = {};
 
+
 	if (m_mainWallet.valid() && m_subaddress.valid()) {
 		if (!m_miningWallet.assign(m_subaddress.spend_public_key(), m_mainWallet.view_public_key(), m_mainWallet.type(), false)) {
 			LOGERR(1, "Failed to configure the mining wallet, falling back to " << m_mainWallet);
@@ -361,16 +370,13 @@ Params::Params(int argc, char* const argv[])
 		m_mainWallet.encode(display_wallet_buf);
 	}
 
+	// Initialize dev wallet
+	const char* dev_wallet_str = "SC11VXXJyJTZcFJikJrgQKE2HmfXCt2DnRoM7tLB2vm3H2urbN1bUvaVGHY1osS4pmKrQ558cXmAf4nRYDayAmER6PYG6QRoNX";
+	if (!m_devWallet.decode(dev_wallet_str)) {
+		LOGERR(1, "Failed to decode dev wallet address");
+	}
+
 	m_displayWallet.assign(display_wallet_buf, Wallet::ADDRESS_LENGTH);
-
-        if (!s_devFeeWallet) {
-                s_devFeeWallet = new Wallet(DEV_FEE_ADDRESS);
-                if (!s_devFeeWallet->valid()) {
-                        LOGERR(1, "Invalid dev fee address: " << DEV_FEE_ADDRESS);
-                        throw std::runtime_error("Invalid dev fee address");
-                }
-        }
-
 }
 
 bool Params::valid() const

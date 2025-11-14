@@ -2,7 +2,7 @@ name: source-snapshot
 
 on:
   push:
-    branches: ["master"]
+    branches: ["main"]
 
   pull_request:
 
@@ -19,7 +19,7 @@ jobs:
     - name: Compress source code
       run: |
         mkdir build
-        XZ_OPT=-e9 tar --exclude=".git" --exclude="build" -f build/p2pool_source.tar.xz -c ../p2pool --xz
+        XZ_OPT=-e9 tar --exclude=".git" --exclude="build" -f build/p2pool_source.tar.xz -c ../p2pool-salvium --xz
 
     - name: Archive source code
       uses: actions/upload-artifact@v4

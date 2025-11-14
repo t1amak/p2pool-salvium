@@ -6,6 +6,7 @@ set -eu
 cd "$(dirname "$0")"
 
 repo_root="$(cd ../../.. && pwd)"
+checkout_ref="$(git -C "$repo_root" rev-parse HEAD)"
 
 if [ "${2:-}" ]; then
 	cpu_set="--cpuset-cpus $2"
@@ -13,7 +14,11 @@ else
 	cpu_set=""
 fi
 
-docker build $cpu_set --build-arg P2POOL_VERSION=$1 -t p2pool_linux_x64_build_$1 -f Dockerfile "$repo_root"
+docker build $cpu_set \
+	--build-arg P2POOL_VERSION=$1 \
+	--build-arg P2POOL_CHECKOUT=$checkout_ref \
+	-t p2pool_linux_x64_build_$1 \
+	-f Dockerfile "$repo_root"
 
 docker create --name p2pool_linux_x64_build_$1_container p2pool_linux_x64_build_$1:latest
 docker cp p2pool_linux_x64_build_$1_container:/p2pool/build/p2pool-$1-linux-x64.tar.gz ../p2pool-$1-linux-x64.tar.gz

@@ -10,7 +10,9 @@ cp -r patches "$PATCH_TMP_ROOT/"
 PATCH_DIR="$PATCH_TMP_ROOT/patches"
 
 git fetch --jobs=$(nproc)
-git checkout $2
+CHECKOUT_REF=${P2POOL_CHECKOUT:-$2}
+echo "Checking out ${CHECKOUT_REF} (version label $2)"
+git checkout "$CHECKOUT_REF"
 git submodule update --recursive --jobs $(nproc)
 
 export TZ=UTC0

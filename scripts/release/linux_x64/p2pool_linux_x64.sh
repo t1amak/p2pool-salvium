@@ -4,6 +4,7 @@ set -e
 cd /p2pool
 git fetch --jobs=$(nproc)
 CHECKOUT_REF=${P2POOL_CHECKOUT:-$2}
+echo "Checking out ${CHECKOUT_REF} (version label $2)"
 git checkout "$CHECKOUT_REF"
 git submodule update --recursive --jobs $(nproc)
 

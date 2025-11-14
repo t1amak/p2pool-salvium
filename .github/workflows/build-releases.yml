@@ -18,7 +18,6 @@ jobs:
     timeout-minutes: 360
     env:
       P2POOL_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
-      SKIP_NON_WINDOWS_BUILDS: "true"
 
     steps:
       - name: Checkout repository
@@ -43,12 +42,10 @@ jobs:
           ./build.sh
 
       - name: Build Linux x64 release
-        if: env.SKIP_NON_WINDOWS_BUILDS != 'true'
         shell: bash
         run: scripts/release/linux_x64/build.sh "${P2POOL_VERSION}"
 
       - name: Build macOS aarch64 release
-        if: env.SKIP_NON_WINDOWS_BUILDS != 'true'
         shell: bash
         run: scripts/release/macos_aarch64/build.sh "${P2POOL_VERSION}"
 
@@ -67,7 +64,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: p2pool-${{ env.P2POOL_VERSION }}-releases
-          if-no-files-found: warn
+          if-no-files-found: error
           path: |
             scripts/release/p2pool-${{ env.P2POOL_VERSION }}-linux-x64.tar.gz
             scripts/release/p2pool-${{ env.P2POOL_VERSION }}-macos-aarch64.tar.gz

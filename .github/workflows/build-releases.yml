@@ -7,7 +7,14 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Tag or commit to build (e.g. v4.9)'
+        description: 'Tag to build and create a release for (e.g. v4.9)'
+        required: true # Changed to true, as a version is required for a release
+      title:
+        description: 'Title for the release (defaults to version tag)'
+        required: false
+        default: ''
+      description:
+        description: 'Description for the release (supports Markdown)'
         required: false
         default: ''
 
@@ -17,6 +24,7 @@ jobs:
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 360
     env:
+      # This logic correctly gets the version from either the dispatch input or the tag name
       P2POOL_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
 
     steps:
@@ -32,6 +40,22 @@ jobs:
           if [ -z "${P2POOL_VERSION}" ]; then
             echo "P2POOL_VERSION is empty. Trigger the workflow from a tag or provide the version input."
             exit 1
+          fi
+          echo "Building release for ${P2POOL_VERSION}"
+
+      # This new step sets the title and body for the release
+      - name: Set Release Title and Body
+        id: set_release_vars
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            # Use dispatch inputs, with a fallback for the title
+            echo "title=${{ github.event.inputs.title || env.P2POOL_VERSION }}" >> $GITHUB_OUTPUT
+            echo "body=${{ github.event.inputs.description || 'No description provided.' }}" >> $GITHUB_OUTPUT
+          else
+            # Use tag name for title and a default body for tag pushes
+            echo "title=${{ env.P2POOL_VERSION }}" >> $GITHUB_OUTPUT
+            echo "body=Release for tag ${{ env.P2POOL_VERSION }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Build base toolchain image
@@ -60,13 +84,24 @@ jobs:
           cd scripts/release
           ./gen_sums.sh
 
-      - name: Upload release artifacts
-        uses: actions/upload-artifact@v4
+      # This step replaces the old 'upload-artifact' step
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: p2pool-${{ env.P2POOL_VERSION }}-releases
-          if-no-files-found: error
-          path: |
+          # The tag_name this release will be associated with
+          tag_name: ${{ env.P2POOL_VERSION }}
+          # The title of the release (from the step above)
+          name: ${{ steps.set_release_vars.outputs.title }}
+          # The body/description of the release (from the step above)
+          body: ${{ steps.set_release_vars.outputs.body }}
+          # The files to upload as release assets
+          files: |
             scripts/release/p2pool-${{ env.P2POOL_VERSION }}-linux-x64.tar.gz
             scripts/release/p2pool-${{ env.P2POOL_VERSION }}-macos-aarch64.tar.gz
             scripts/release/p2pool-${{ env.P2POOL_VERSION }}-windows-x64.zip
             scripts/release/sha256sums.txt
+          draft: false
+          prerelease: false
+        env:
+          # The GITHUB_TOKEN is required to create releases
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

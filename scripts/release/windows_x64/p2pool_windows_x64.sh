@@ -26,6 +26,14 @@ flags_datetime="-D__DATE__=\"\\\"$CURRENT_DATE\\\"\" -D__TIME__=\"\\\"$CURRENT_T
 MINGW_SYSROOT="$(x86_64-w64-mingw32-g++ -print-sysroot)"
 flags_sysroot="--sysroot=$MINGW_SYSROOT"
 
+# Fix mingw-w64 headers for clang: skip redefining __cpuidex when clang already
+# provides one via its cpuid.h.
+if [ -f "$PATCH_DIR/mingw/clang-cpuidex.patch" ]; then
+	cd "$MINGW_SYSROOT"
+	patch -N -p1 < "$PATCH_DIR/mingw/clang-cpuidex.patch" || true
+	cd /p2pool
+fi
+
 flags_libs="--target=x86_64-pc-windows-gnu $flags_sysroot -Os -flto -Wl,/timestamp:$BUILD_TIMESTAMP -fuse-ld=lld -w $flags_size $flags_datetime"
 
 flags_p2pool="--target=x86_64-pc-windows-gnu $flags_sysroot -Wl,/timestamp:$BUILD_TIMESTAMP -fuse-ld=lld -femulated-tls -Wno-unused-command-line-argument -Wno-unknown-attributes $flags_size $flags_datetime"

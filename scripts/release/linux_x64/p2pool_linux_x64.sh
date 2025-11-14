@@ -3,7 +3,8 @@ set -e
 
 cd /p2pool
 git fetch --jobs=$(nproc)
-git checkout $2
+CHECKOUT_REF=${P2POOL_CHECKOUT:-$2}
+git checkout "$CHECKOUT_REF"
 git submodule update --recursive --jobs $(nproc)
 
 export TZ=UTC0

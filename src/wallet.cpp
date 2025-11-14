@@ -42,8 +42,6 @@ constexpr uint64_t valid_prefixes[] = { 0x180c96, 0x254c96, 0x24cc96 };  // SC1,
 constexpr uint64_t valid_prefixes_subaddress[] = { 0x314c96, 0x3c54c96, 0x384cc96 };  // SC1s, SC1Ts, SC1Ss
 
 constexpr std::array<int, 9> block_sizes{ 0, 2, 3, 5, 6, 7, 9, 10, 11 };
-constexpr int num_full_blocks = p2pool::Wallet::ADDRESS_LENGTH / block_sizes.back();
-constexpr int last_block_size = p2pool::Wallet::ADDRESS_LENGTH % block_sizes.back();
 
 constexpr int block_sizes_lookup[11] = { 0, -1, 1, 2, -1, 3, 4, 5, -1, 6, 7 };
 

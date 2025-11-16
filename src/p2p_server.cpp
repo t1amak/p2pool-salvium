@@ -56,6 +56,7 @@ static constexpr std::array<const char*, 2> seed_nodes_nano{ "seed01.whiskymine.
 static constexpr int DEFAULT_BACKLOG = 16;
 static constexpr uint64_t DEFAULT_BAN_TIME = 600;
 static constexpr uint64_t PEER_REQUEST_DELAY = 60;
+static constexpr uint8_t TX_VERSION = 60;
 
 namespace p2pool {
 
@@ -3182,7 +3183,8 @@ bool P2PServer::P2PClient::on_monero_block_broadcast(const uint8_t* buf, uint32_
 		return false;
 	}
 
-	if (buf[data.header_size] != TX_VERSION) {
+        uint8_t tx_ver = buf[data.header_size];
+        if (tx_ver != 4 && tx_ver != TX_VERSION) {
 		LOGWARN(3, "Invalid MONERO_BLOCK_BROADCAST: TX_VERSION byte not found");
 		return false;
 	}

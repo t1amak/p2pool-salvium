@@ -1155,6 +1155,14 @@ void p2pool::submit_block() const
 	}
 	else {
 		LOGINFO(0, log::LightGreen() << "submit_block: height = " << height << ", external blob (" << submit_data.blob.size() << " bytes)");
+                std::string hex;
+                hex.reserve(submit_data.blob.size() * 2);
+                for (size_t i = 0; i < std::min<size_t>(submit_data.blob.size(), 400); ++i) {
+                        char buf[3];
+                        snprintf(buf, sizeof(buf), "%02x", submit_data.blob[i]);
+                        hex.append(buf);
+                }
+                LOGINFO(0, "BLOB HEX (first 400 bytes): " << hex);
 		is_external = true;
 	}
 

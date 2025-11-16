@@ -25,262 +25,268 @@ namespace p2pool {
 // Semantics must also be checked elsewhere before accepting the block (PoW, reward split between miners, difficulty calculation and so on)
 int PoolBlock::deserialize(const uint8_t* data, size_t size, const SideChain& sidechain, uv_loop_t* loop, bool compact)
 {
-	try {
-		// Sanity check
-		if (!data || (size > MAX_BLOCK_SIZE)) {
-			return __LINE__;
-		}
+        try {
+                // Sanity check
+                if (!data || (size > MAX_BLOCK_SIZE)) {
+                        return __LINE__;
+                }
 
-		const uint8_t* const data_begin = data;
-		const uint8_t* const data_end = data + size;
+                const uint8_t* const data_begin = data;
+                const uint8_t* const data_end = data + size;
 
-		auto read_byte = [&data, data_end](uint8_t& b) -> bool
-		{
-			if (data < data_end) {
-				b = *(data++);
-				return true;
-			}
-			return false;
-		};
+                auto read_byte = [&data, data_end](uint8_t& b) -> bool
+                {
+                        if (data < data_end) {
+                                b = *(data++);
+                                return true;
+                        }
+                        return false;
+                };
 
 #define READ_BYTE(x) do { if (!read_byte(x)) return __LINE__; } while (0)
 #define EXPECT_BYTE(value) do { uint8_t tmp; READ_BYTE(tmp); if (tmp != (value)) return __LINE__; } while (0)
 
 #define READ_VARINT(x) do { data = readVarint(data, data_end, x); if (!data) return __LINE__; } while(0)
 
-		auto read_buf = [&data, data_end](void* buf, size_t size) -> bool
-		{
-			if (static_cast<size_t>(data_end - data) < size) {
-				return false;
-			}
+                auto read_buf = [&data, data_end](void* buf, size_t size) -> bool
+                {
+                        if (static_cast<size_t>(data_end - data) < size) {
+                                return false;
+                        }
 
-			memcpy(buf, data, size);
-			data += size;
-			return true;
-		};
+                        memcpy(buf, data, size);
+                        data += size;
+                        return true;
+                };
 
 #define READ_BUF(buf, size) do { if (!read_buf((buf), (size))) return __LINE__; } while(0)
 
-		READ_BYTE(m_majorVersion);
-		if (m_majorVersion > HARDFORK_SUPPORTED_VERSION) return __LINE__;
+                READ_BYTE(m_majorVersion);
+                if (m_majorVersion > HARDFORK_SUPPORTED_VERSION) return __LINE__;
 
-		READ_BYTE(m_minorVersion);
-		if (m_minorVersion < m_majorVersion) return __LINE__;
+                READ_BYTE(m_minorVersion);
+                if (m_minorVersion < m_majorVersion) return __LINE__;
 
-		READ_VARINT(m_timestamp);
-		READ_BUF(m_prevId.h, HASH_SIZE);
+                READ_VARINT(m_timestamp);
+                READ_BUF(m_prevId.h, HASH_SIZE);
 
-		if (m_minorVersion > 127) return __LINE__;
+                if (m_minorVersion > 127) return __LINE__;
 
-		const int nonce_offset = static_cast<int>(data - data_begin);
-		READ_BUF(&m_nonce, NONCE_SIZE);
+                const int nonce_offset = static_cast<int>(data - data_begin);
+                READ_BUF(&m_nonce, NONCE_SIZE);
 
-		EXPECT_BYTE(TX_VERSION);
+                // Accept both old (4) and new (60) TX_VERSION during transition
+                uint8_t tx_version;
+                READ_BYTE(tx_version);
+                if (tx_version != 4 && tx_version != TX_VERSION) return __LINE__;
 
-		uint64_t unlock_height;
-		READ_VARINT(unlock_height);
+                uint64_t unlock_height;
+                READ_VARINT(unlock_height);
 
-		EXPECT_BYTE(1);
-		EXPECT_BYTE(TXIN_GEN);
+                EXPECT_BYTE(1);
+                EXPECT_BYTE(TXIN_GEN);
 
-		READ_VARINT(m_txinGenHeight);
-		if (m_majorVersion != sidechain.network_major_version(m_txinGenHeight)) return __LINE__;
-		if (unlock_height != m_txinGenHeight + MINER_REWARD_UNLOCK_TIME) return __LINE__;
+                READ_VARINT(m_txinGenHeight);
+                if (m_majorVersion != sidechain.network_major_version(m_txinGenHeight)) return __LINE__;
+                if (unlock_height != m_txinGenHeight + MINER_REWARD_UNLOCK_TIME) return __LINE__;
 
-		std::vector<uint8_t> outputs_blob;
-		const int outputs_offset = static_cast<int>(data - data_begin);
+                std::vector<uint8_t> outputs_blob;
+                const int outputs_offset = static_cast<int>(data - data_begin);
 
-		uint64_t num_outputs;
-		READ_VARINT(num_outputs);
+                uint64_t num_outputs;
+                READ_VARINT(num_outputs);
 
-		uint64_t total_reward = 0;
-		int outputs_blob_size;
+                uint64_t total_reward = 0;
+                int outputs_blob_size;
 
-		if (num_outputs > 0) {
-			// Outputs are in the buffer, just read them
-			// Each output is at least 34 bytes, exit early if there's not enough data left
-			// 1 byte for reward, 1 byte for tx_type, 32 bytes for eph_pub_key
-			constexpr uint64_t MIN_OUTPUT_SIZE = 34;
+                if (num_outputs > 0) {
+                        // Outputs are in the buffer, just read them
+                        // Each output is at least 34 bytes, exit early if there's not enough data left
+                        // 1 byte for reward, 1 byte for tx_type, 32 bytes for eph_pub_key
+                        constexpr uint64_t MIN_OUTPUT_SIZE = 34;
 
-			if (num_outputs > std::numeric_limits<uint64_t>::max() / MIN_OUTPUT_SIZE) return __LINE__;
-			if (static_cast<uint64_t>(data_end - data) < num_outputs * MIN_OUTPUT_SIZE) return __LINE__;
+                        if (num_outputs > std::numeric_limits<uint64_t>::max() / MIN_OUTPUT_SIZE) return __LINE__;
+                        if (static_cast<uint64_t>(data_end - data) < num_outputs * MIN_OUTPUT_SIZE) return __LINE__;
 
-			m_ephPublicKeys.resize(num_outputs);
-			m_outputAmounts.resize(num_outputs);
+                        m_ephPublicKeys.resize(num_outputs);
+                        m_outputAmounts.resize(num_outputs);
 
-			m_ephPublicKeys.shrink_to_fit();
-			m_outputAmounts.shrink_to_fit();
+                        m_ephPublicKeys.shrink_to_fit();
+                        m_outputAmounts.shrink_to_fit();
 
-			for (uint64_t i = 0; i < num_outputs; ++i) {
-				TxOutput& t = m_outputAmounts[i];
+                        for (uint64_t i = 0; i < num_outputs; ++i) {
+                                TxOutput& t = m_outputAmounts[i];
 
-				uint64_t reward;
-				READ_VARINT(reward);
+                                uint64_t reward;
+                                READ_VARINT(reward);
 
-				// TxOutput max value check
-				if (reward >= (1ULL << 56)) {
-					return __LINE__;
-				}
+                                // TxOutput max value check
+                                if (reward >= (1ULL << 56)) {
+                                        return __LINE__;
+                                }
 
-				t.m_reward = reward;
-				total_reward += reward;
+                                t.m_reward = reward;
+                                total_reward += reward;
 
-				EXPECT_BYTE(TXOUT_TO_TAGGED_KEY);
+                                EXPECT_BYTE(TXOUT_TO_TAGGED_KEY);
 
-				hash ephPublicKey;
-				READ_BUF(ephPublicKey.h, HASH_SIZE);
-				m_ephPublicKeys[i] = ephPublicKey;
+                                hash ephPublicKey;
+                                READ_BUF(ephPublicKey.h, HASH_SIZE);
+                                m_ephPublicKeys[i] = ephPublicKey;
 
-				uint8_t view_tag;
-				READ_BYTE(view_tag);
-				t.m_viewTag = view_tag;
-			}
+                                uint8_t view_tag;
+                                READ_BYTE(view_tag);
+                                t.m_viewTag = view_tag;
+                        }
 
-			outputs_blob_size = static_cast<int>(data - data_begin) - outputs_offset;
-			outputs_blob.assign(data_begin + outputs_offset, data);
+                        outputs_blob_size = static_cast<int>(data - data_begin) - outputs_offset;
+                        outputs_blob.assign(data_begin + outputs_offset, data);
 
-			m_sidechainId.clear();
-		}
-		else {
-			// Outputs are not in the buffer and must be calculated from sidechain data
-			// We only have total reward and outputs blob size here
-			READ_VARINT(total_reward);
+                        m_sidechainId.clear();
+                }
+                else {
+                        // Outputs are not in the buffer and must be calculated from sidechain data
+                        // We only have total reward and outputs blob size here
+                        READ_VARINT(total_reward);
 
-			uint64_t tmp;
-			READ_VARINT(tmp);
+                        uint64_t tmp;
+                        READ_VARINT(tmp);
 
-			// Sanity check
-			if ((tmp == 0) || (tmp > MAX_BLOCK_SIZE)) {
-				return __LINE__;
-			}
+                        // Sanity check
+                        if ((tmp == 0) || (tmp > MAX_BLOCK_SIZE)) {
+                                return __LINE__;
+                        }
 
-			outputs_blob_size = static_cast<int>(tmp);
+                        outputs_blob_size = static_cast<int>(tmp);
 
-			// Required by sidechain.get_outputs_blob() to speed up repeated broadcasts from different peers
-			READ_BUF(m_sidechainId.h, HASH_SIZE);
-		}
+                        // Required by sidechain.get_outputs_blob() to speed up repeated broadcasts from different peers
+                        READ_BUF(m_sidechainId.h, HASH_SIZE);
+                }
 
-		// Technically some p2pool node could keep stuffing block with transactions until reward is less than 0.6 XMR
-		// But default transaction picking algorithm never does that. It's better to just ban such nodes
-		if (total_reward < BASE_BLOCK_REWARD) {
-			return __LINE__;
-		}
+                // Technically some p2pool node could keep stuffing block with transactions until reward is less than 0.6 XMR
+                // But default transaction picking algorithm never does that. It's better to just ban such nodes
+                if (total_reward < BASE_BLOCK_REWARD) {
+                        return __LINE__;
+                }
 
-		const int outputs_actual_blob_size = static_cast<int>(data - data_begin) - outputs_offset;
-		if (outputs_blob_size < outputs_actual_blob_size) {
-			return __LINE__;
-		}
+                const int outputs_actual_blob_size = static_cast<int>(data - data_begin) - outputs_offset;
+                if (outputs_blob_size < outputs_actual_blob_size) {
+                        return __LINE__;
+                }
 
-		const int outputs_blob_size_diff = outputs_blob_size - outputs_actual_blob_size;
+                const int outputs_blob_size_diff = outputs_blob_size - outputs_actual_blob_size;
 
-		uint64_t tx_extra_size;
-		READ_VARINT(tx_extra_size);
+                uint64_t tx_extra_size;
+                READ_VARINT(tx_extra_size);
 
-		const uint8_t* tx_extra_begin = data;
+                const uint8_t* tx_extra_begin = data;
 
-		EXPECT_BYTE(TX_EXTRA_TAG_PUBKEY);
-		READ_BUF(m_txkeyPub.h, HASH_SIZE);
+                EXPECT_BYTE(TX_EXTRA_TAG_PUBKEY);
+                READ_BUF(m_txkeyPub.h, HASH_SIZE);
 
-		EXPECT_BYTE(TX_EXTRA_NONCE);
-		READ_VARINT(m_extraNonceSize);
+                EXPECT_BYTE(TX_EXTRA_NONCE);
+                READ_VARINT(m_extraNonceSize);
 
-		// Sanity check
-		if ((m_extraNonceSize < EXTRA_NONCE_SIZE) || (m_extraNonceSize > EXTRA_NONCE_MAX_SIZE)) return __LINE__;
+                // Sanity check
+                if ((m_extraNonceSize < EXTRA_NONCE_SIZE) || (m_extraNonceSize > EXTRA_NONCE_MAX_SIZE)) return __LINE__;
 
-		const int extra_nonce_offset = static_cast<int>((data - data_begin) + outputs_blob_size_diff);
-		READ_BUF(&m_extraNonce, EXTRA_NONCE_SIZE);
-		for (uint64_t i = EXTRA_NONCE_SIZE; i < m_extraNonceSize; ++i) {
-			EXPECT_BYTE(0);
-		}
+                const int extra_nonce_offset = static_cast<int>((data - data_begin) + outputs_blob_size_diff);
+                READ_BUF(&m_extraNonce, EXTRA_NONCE_SIZE);
+                for (uint64_t i = EXTRA_NONCE_SIZE; i < m_extraNonceSize; ++i) {
+                        EXPECT_BYTE(0);
+                }
 
-		EXPECT_BYTE(TX_EXTRA_MERGE_MINING_TAG);
+                EXPECT_BYTE(TX_EXTRA_MERGE_MINING_TAG);
 
-		int mm_root_hash_offset;
-		uint32_t mm_n_aux_chains, mm_nonce;
+                int mm_root_hash_offset;
+                uint32_t mm_n_aux_chains, mm_nonce;
 
-		uint64_t mm_field_size;
-		READ_VARINT(mm_field_size);
+                uint64_t mm_field_size;
+                READ_VARINT(mm_field_size);
 
-		const uint8_t* const mm_field_begin = data;
+                const uint8_t* const mm_field_begin = data;
 
-		READ_VARINT(m_merkleTreeData);
+                READ_VARINT(m_merkleTreeData);
 
-		m_merkleTreeDataSize = static_cast<uint32_t>(data - mm_field_begin);
+                m_merkleTreeDataSize = static_cast<uint32_t>(data - mm_field_begin);
 
-		decode_merkle_tree_data(mm_n_aux_chains, mm_nonce);
+                decode_merkle_tree_data(mm_n_aux_chains, mm_nonce);
 
-		mm_root_hash_offset = static_cast<int>((data - data_begin) + outputs_blob_size_diff);
-		READ_BUF(m_merkleRoot.h, HASH_SIZE);
+                mm_root_hash_offset = static_cast<int>((data - data_begin) + outputs_blob_size_diff);
+                READ_BUF(m_merkleRoot.h, HASH_SIZE);
 
-		if (static_cast<uint64_t>(data - mm_field_begin) != mm_field_size) {
-			return __LINE__;
-		}
+                if (static_cast<uint64_t>(data - mm_field_begin) != mm_field_size) {
+                        return __LINE__;
+                }
 
-		if (static_cast<uint64_t>(data - tx_extra_begin) != tx_extra_size) return __LINE__;
+                if (static_cast<uint64_t>(data - tx_extra_begin) != tx_extra_size) return __LINE__;
 
-		EXPECT_BYTE(0);
+                EXPECT_BYTE(0);
                 
                 // Protocol TX (Salvium Carrot v1+) - parse if present
                 if (m_majorVersion >= 10) {
                         // Save position in case we need to backtrack
                         const uint8_t* saved_pos = data;
                         
-                        uint64_t next_val;
-                        const uint8_t* peek = readVarint(data, data_end, next_val);
+                        uint64_t first_val;
+                        const uint8_t* peek1 = readVarint(data, data_end, first_val);
                         
-                        // Check if this looks like protocol_tx (version 4) or num_transactions
-                        // num_transactions is typically 0-100, protocol version is 4
-                        if (peek && next_val == 4) {
-                                // Likely protocol_tx, try to parse it
-                                data = peek;  // Consume the version varint
+                        // Check if this is protocol_tx by looking for signature: version(4) + unlock_time(60)
+                        // This avoids false positive when num_transactions = 4
+                        if (peek1 && first_val == 4) {
+                                uint64_t second_val;
+                                const uint8_t* peek2 = readVarint(peek1, data_end, second_val);
                                 
-                                uint64_t protocol_unlock_time;
-                                data = readVarint(data, data_end, protocol_unlock_time);
-                                if (!data) { data = saved_pos; goto skip_protocol_tx; }
-                                
-                                uint64_t protocol_vin_size;
-                                data = readVarint(data, data_end, protocol_vin_size);
-                                if (!data || protocol_vin_size != 1) { data = saved_pos; goto skip_protocol_tx; }
-                                
-                                uint8_t txin_type;
-                                READ_BYTE(txin_type);
-                                if (txin_type != TXIN_GEN) { data = saved_pos; goto skip_protocol_tx; }
-                                
-                                uint64_t protocol_height;
-                                data = readVarint(data, data_end, protocol_height);
-                                if (!data) { data = saved_pos; goto skip_protocol_tx; }
-                                
-                                uint64_t protocol_vout_size;
-                                data = readVarint(data, data_end, protocol_vout_size);
-                                if (!data) { data = saved_pos; goto skip_protocol_tx; }
-                                
-                                // Skip vout if any
-                                for (uint64_t i = 0; i < protocol_vout_size; ++i) {
-                                        uint64_t amount;
-                                        data = readVarint(data, data_end, amount);
+                                // Only parse as protocol_tx if we see version=4 AND unlock_time=60
+                                if (peek2 && second_val == 60) {
+                                        // This is a protocol_tx, parse it
+                                        data = peek1;  // Consume version varint
+                                        data = peek2;  // Consume unlock_time varint
+                                        
+                                        uint64_t protocol_vin_size;
+                                        data = readVarint(data, data_end, protocol_vin_size);
+                                        if (!data || protocol_vin_size != 1) { data = saved_pos; goto skip_protocol_tx; }
+                                        
+                                        uint8_t txin_type;
+                                        if (!read_byte(txin_type)) { data = saved_pos; goto skip_protocol_tx; }
+                                        if (txin_type != TXIN_GEN) { data = saved_pos; goto skip_protocol_tx; }
+                                        
+                                        uint64_t protocol_height;
+                                        data = readVarint(data, data_end, protocol_height);
                                         if (!data) { data = saved_pos; goto skip_protocol_tx; }
-                                        uint8_t type;
-                                        READ_BYTE(type);
-                                        // Skip output data based on type
-                                        if (!read_buf(nullptr, 32)) { data = saved_pos; goto skip_protocol_tx; }
+                                        
+                                        uint64_t protocol_vout_size;
+                                        data = readVarint(data, data_end, protocol_vout_size);
+                                        if (!data) { data = saved_pos; goto skip_protocol_tx; }
+                                        
+                                        // Skip vout if any
+                                        for (uint64_t i = 0; i < protocol_vout_size; ++i) {
+                                                uint64_t amount;
+                                                data = readVarint(data, data_end, amount);
+                                                if (!data) { data = saved_pos; goto skip_protocol_tx; }
+                                                uint8_t type;
+                                                if (!read_byte(type)) { data = saved_pos; goto skip_protocol_tx; }
+                                                // Skip output data (32 bytes for key)
+                                                if (!read_buf(nullptr, 32)) { data = saved_pos; goto skip_protocol_tx; }
+                                        }
+                                        
+                                        uint64_t protocol_extra_size;
+                                        data = readVarint(data, data_end, protocol_extra_size);
+                                        if (!data) { data = saved_pos; goto skip_protocol_tx; }
+                                        
+                                        for (uint64_t i = 0; i < protocol_extra_size; ++i) {
+                                                uint8_t tmp;
+                                                if (!read_byte(tmp)) { data = saved_pos; goto skip_protocol_tx; }
+                                        }
+                                        
+                                        uint64_t protocol_type;
+                                        data = readVarint(data, data_end, protocol_type);
+                                        if (!data) { data = saved_pos; goto skip_protocol_tx; }
+                                        
+                                        uint8_t rct;
+                                        if (!read_byte(rct)) { data = saved_pos; goto skip_protocol_tx; }
+                                        if (rct != 0) { data = saved_pos; goto skip_protocol_tx; }
                                 }
-                                
-                                uint64_t protocol_extra_size;
-                                data = readVarint(data, data_end, protocol_extra_size);
-                                if (!data) { data = saved_pos; goto skip_protocol_tx; }
-                                
-                                for (uint64_t i = 0; i < protocol_extra_size; ++i) {
-                                        uint8_t tmp;
-                                        READ_BYTE(tmp);
-                                }
-                                
-                                uint64_t protocol_type;
-                                data = readVarint(data, data_end, protocol_type);
-                                if (!data) { data = saved_pos; goto skip_protocol_tx; }
-                                
-                                uint8_t rct;
-                                READ_BYTE(rct);
-                                if (rct != 0) { data = saved_pos; goto skip_protocol_tx; }
                         }
                 }
                 
@@ -288,300 +294,301 @@ skip_protocol_tx:
                 uint64_t num_transactions;
                 READ_VARINT(num_transactions);
 
-		const int transactions_offset = static_cast<int>(data - data_begin);
+                const int transactions_offset = static_cast<int>(data - data_begin);
 
-		std::vector<uint64_t> parent_indices;
-		std::vector<hash> transactions;
-		if (compact) {
-			if (static_cast<uint64_t>(data_end - data) < num_transactions) return __LINE__;
+                std::vector<uint64_t> parent_indices;
+                std::vector<hash> transactions;
+                if (compact) {
+                        if (static_cast<uint64_t>(data_end - data) < num_transactions) return __LINE__;
 
-			// limit reserved memory size because we can't check "num_transactions" properly here
-			const uint64_t k = std::min<uint64_t>(num_transactions + 1, 256);
-			transactions.reserve(k);
-			parent_indices.reserve(k);
+                        // limit reserved memory size because we can't check "num_transactions" properly here
+                        const uint64_t k = std::min<uint64_t>(num_transactions + 1, 256);
+                        transactions.reserve(k);
+                        parent_indices.reserve(k);
 
-			transactions.resize(1);
-			parent_indices.resize(1);
+                        transactions.resize(1);
+                        parent_indices.resize(1);
 
-			for (uint64_t i = 0; i < num_transactions; ++i) {
-				uint64_t parent_index;
-				READ_VARINT(parent_index);
+                        for (uint64_t i = 0; i < num_transactions; ++i) {
+                                uint64_t parent_index;
+                                READ_VARINT(parent_index);
 
-				hash id;
-				if (parent_index == 0) {
-					READ_BUF(id.h, HASH_SIZE);
-				}
+                                hash id;
+                                if (parent_index == 0) {
+                                        READ_BUF(id.h, HASH_SIZE);
+                                }
 
-				transactions.emplace_back(id);
-				parent_indices.emplace_back(parent_index);
-			}
-		}
-		else {
-			if (num_transactions > std::numeric_limits<uint64_t>::max() / HASH_SIZE) return __LINE__;
-			if (static_cast<uint64_t>(data_end - data) < num_transactions * HASH_SIZE) return __LINE__;
+                                transactions.emplace_back(id);
+                                parent_indices.emplace_back(parent_index);
+                        }
+                }
+                else {
+                        if (num_transactions > std::numeric_limits<uint64_t>::max() / HASH_SIZE) return __LINE__;
+                        if (static_cast<uint64_t>(data_end - data) < num_transactions * HASH_SIZE) return __LINE__;
 
-			transactions.reserve(num_transactions + 1);
-			transactions.resize(1);
+                        transactions.reserve(num_transactions + 1);
+                        transactions.resize(1);
 
-			for (uint64_t i = 0; i < num_transactions; ++i) {
-				hash id;
-				READ_BUF(id.h, HASH_SIZE);
-				transactions.emplace_back(id);
-			}
-		}
+                        for (uint64_t i = 0; i < num_transactions; ++i) {
+                                hash id;
+                                READ_BUF(id.h, HASH_SIZE);
+                                transactions.emplace_back(id);
+                        }
+                }
 
-		const int transactions_actual_blob_size = static_cast<int>(data - data_begin) - transactions_offset;
-		const int transactions_blob_size = static_cast<int>(num_transactions) * HASH_SIZE;
-		const int transactions_blob_size_diff = transactions_blob_size - transactions_actual_blob_size;
+                const int transactions_actual_blob_size = static_cast<int>(data - data_begin) - transactions_offset;
+                const int transactions_blob_size = static_cast<int>(num_transactions) * HASH_SIZE;
+                const int transactions_blob_size_diff = transactions_blob_size - transactions_actual_blob_size;
 
 #if POOL_BLOCK_DEBUG
-		m_mainChainDataDebug.reserve((data - data_begin) + outputs_blob_size_diff + transactions_blob_size_diff);
-		m_mainChainDataDebug.assign(data_begin, data_begin + outputs_offset);
-		m_mainChainDataDebug.insert(m_mainChainDataDebug.end(), outputs_blob_size, 0);
-		m_mainChainDataDebug.insert(m_mainChainDataDebug.end(), data_begin + outputs_offset + outputs_actual_blob_size, data_begin + transactions_offset);
-		m_mainChainDataDebug.insert(m_mainChainDataDebug.end(), transactions_blob_size, 0);
-		m_mainChainDataDebug.insert(m_mainChainDataDebug.end(), data_begin + transactions_offset + transactions_actual_blob_size, data);
+                m_mainChainDataDebug.reserve((data - data_begin) + outputs_blob_size_diff + transactions_blob_size_diff);
+                m_mainChainDataDebug.assign(data_begin, data_begin + outputs_offset);
+                m_mainChainDataDebug.insert(m_mainChainDataDebug.end(), outputs_blob_size, 0);
+                m_mainChainDataDebug.insert(m_mainChainDataDebug.end(), data_begin + outputs_offset + outputs_actual_blob_size, data_begin + transactions_offset);
+                m_mainChainDataDebug.insert(m_mainChainDataDebug.end(), transactions_blob_size, 0);
+                m_mainChainDataDebug.insert(m_mainChainDataDebug.end(), data_begin + transactions_offset + transactions_actual_blob_size, data);
 
-		const uint8_t* sidechain_data_begin = data;
+                const uint8_t* sidechain_data_begin = data;
 #endif
 
-		hash spend_pub_key;
-		hash view_pub_key;
-		READ_BUF(spend_pub_key.h, HASH_SIZE);
-		READ_BUF(view_pub_key.h, HASH_SIZE);
-		if (!m_minerWallet.assign(spend_pub_key, view_pub_key, sidechain.network_type(), false)) {
-			return __LINE__;
-		}
+                hash spend_pub_key;
+                hash view_pub_key;
+                READ_BUF(spend_pub_key.h, HASH_SIZE);
+                READ_BUF(view_pub_key.h, HASH_SIZE);
+                if (!m_minerWallet.assign(spend_pub_key, view_pub_key, sidechain.network_type(), false)) {
+                        return __LINE__;
+                }
 
-		READ_BUF(m_txkeySecSeed.h, HASH_SIZE);
+                READ_BUF(m_txkeySecSeed.h, HASH_SIZE);
 
-		hash pub;
-		get_tx_keys(pub, m_txkeySec, m_txkeySecSeed, m_prevId);
-		if (pub != m_txkeyPub) {
-			return __LINE__;
-		}
+                hash pub;
+                get_tx_keys(pub, m_txkeySec, m_txkeySecSeed, m_prevId);
+                if (pub != m_txkeyPub) {
+                        return __LINE__;
+                }
 
-		if (!check_keys(m_txkeyPub, m_txkeySec)) {
-			return __LINE__;
-		}
+                if (!check_keys(m_txkeyPub, m_txkeySec)) {
+                        return __LINE__;
+                }
 
-		READ_BUF(m_parent.h, HASH_SIZE);
+                READ_BUF(m_parent.h, HASH_SIZE);
 
-		m_transactions.clear();
-		m_transactions.reserve(transactions.size());
+                m_transactions.clear();
+                m_transactions.reserve(transactions.size());
 
-		if (compact) {
-			const PoolBlock* parent = sidechain.find_block(m_parent);
-			if (!parent) {
-				return __LINE__;
-			}
+                if (compact) {
+                        const PoolBlock* parent = sidechain.find_block(m_parent);
+                        if (!parent) {
+                                return __LINE__;
+                        }
 
-			const uint64_t n = transactions.size();
+                        const uint64_t n = transactions.size();
 
-			if (n > 0) {
-				m_transactions.emplace_back(transactions[0]);
-			}
+                        if (n > 0) {
+                                m_transactions.emplace_back(transactions[0]);
+                        }
 
-			for (uint64_t i = 1; i < n; ++i) {
-				const uint64_t parent_index = parent_indices[i];
-				if (parent_index) {
-					if (parent_index >= parent->m_transactions.size()) {
-						return __LINE__;
-					}
-					transactions[i] = parent->m_transactions[parent_index];
-					m_transactions.emplace_back(parent->m_transactions[parent_index]);
-				}
-				else {
-					m_transactions.emplace_back(transactions[i]);
-				}
-			}
-		}
-		else {
-			for (const hash& h : transactions) {
-				m_transactions.emplace_back(h);
-			}
-		}
+                        for (uint64_t i = 1; i < n; ++i) {
+                                const uint64_t parent_index = parent_indices[i];
+                                if (parent_index) {
+                                        if (parent_index >= parent->m_transactions.size()) {
+                                                return __LINE__;
+                                        }
+                                        transactions[i] = parent->m_transactions[parent_index];
+                                        m_transactions.emplace_back(parent->m_transactions[parent_index]);
+                                }
+                                else {
+                                        m_transactions.emplace_back(transactions[i]);
+                                }
+                        }
+                }
+                else {
+                        for (const hash& h : transactions) {
+                                m_transactions.emplace_back(h);
+                        }
+                }
 
-		m_transactions.shrink_to_fit();
+                m_transactions.shrink_to_fit();
 
-		uint64_t num_uncles;
-		READ_VARINT(num_uncles);
+                uint64_t num_uncles;
+                READ_VARINT(num_uncles);
 
-		if (num_uncles > std::numeric_limits<uint64_t>::max() / HASH_SIZE) return __LINE__;
-		if (static_cast<uint64_t>(data_end - data) < num_uncles * HASH_SIZE) return __LINE__;
+                if (num_uncles > std::numeric_limits<uint64_t>::max() / HASH_SIZE) return __LINE__;
+                if (static_cast<uint64_t>(data_end - data) < num_uncles * HASH_SIZE) return __LINE__;
 
-		m_uncles.clear();
-		m_uncles.reserve(num_uncles);
+                m_uncles.clear();
+                m_uncles.reserve(num_uncles);
 
-		for (uint64_t i = 0; i < num_uncles; ++i) {
-			hash id;
-			READ_BUF(id.h, HASH_SIZE);
-			m_uncles.emplace_back(id);
-		}
+                for (uint64_t i = 0; i < num_uncles; ++i) {
+                        hash id;
+                        READ_BUF(id.h, HASH_SIZE);
+                        m_uncles.emplace_back(id);
+                }
 
-		READ_VARINT(m_sidechainHeight);
+                READ_VARINT(m_sidechainHeight);
 
-		if (m_sidechainHeight > MAX_SIDECHAIN_HEIGHT) {
-			return __LINE__;
-		}
+                if (m_sidechainHeight > MAX_SIDECHAIN_HEIGHT) {
+                        return __LINE__;
+                }
 
-		READ_VARINT(m_difficulty.lo);
-		READ_VARINT(m_difficulty.hi);
+                READ_VARINT(m_difficulty.lo);
+                READ_VARINT(m_difficulty.hi);
 
-		READ_VARINT(m_cumulativeDifficulty.lo);
-		READ_VARINT(m_cumulativeDifficulty.hi);
+                READ_VARINT(m_cumulativeDifficulty.lo);
+                READ_VARINT(m_cumulativeDifficulty.hi);
 
-		if (m_cumulativeDifficulty > MAX_CUMULATIVE_DIFFICULTY) {
-			return __LINE__;
-		}
+                if (m_cumulativeDifficulty > MAX_CUMULATIVE_DIFFICULTY) {
+                        return __LINE__;
+                }
 
-		m_merkleProof.clear();
-		m_mergeMiningExtra.clear();
+                m_merkleProof.clear();
+                m_mergeMiningExtra.clear();
 
-		uint8_t merkle_proof_size;
-		READ_BYTE(merkle_proof_size);
+                uint8_t merkle_proof_size;
+                READ_BYTE(merkle_proof_size);
 
-		if (merkle_proof_size > LOG2_MERGE_MINING_MAX_CHAINS) {
-			return __LINE__;
-		}
+                if (merkle_proof_size > LOG2_MERGE_MINING_MAX_CHAINS) {
+                        return __LINE__;
+                }
 
-		m_merkleProof.reserve(merkle_proof_size);
+                m_merkleProof.reserve(merkle_proof_size);
 
-		for (uint8_t i = 0; i < merkle_proof_size; ++i) {
-			hash h;
-			READ_BUF(h.h, HASH_SIZE);
-			m_merkleProof.emplace_back(h);
-		}
+                for (uint8_t i = 0; i < merkle_proof_size; ++i) {
+                        hash h;
+                        READ_BUF(h.h, HASH_SIZE);
+                        m_merkleProof.emplace_back(h);
+                }
 
-		uint64_t mm_extra_data_count;
-		READ_VARINT(mm_extra_data_count);
+                uint64_t mm_extra_data_count;
+                READ_VARINT(mm_extra_data_count);
 
-		if (mm_extra_data_count) {
-			// Sanity check
-			if (mm_extra_data_count > MERGE_MINING_MAX_CHAINS) return __LINE__;
-			if (static_cast<uint64_t>(data_end - data) < mm_extra_data_count * (HASH_SIZE + 1)) return __LINE__;
+                if (mm_extra_data_count) {
+                        // Sanity check
+                        if (mm_extra_data_count > MERGE_MINING_MAX_CHAINS) return __LINE__;
+                        if (static_cast<uint64_t>(data_end - data) < mm_extra_data_count * (HASH_SIZE + 1)) return __LINE__;
 
-			hash prev_chain_id;
-			
-			for (uint64_t i = 0; i < mm_extra_data_count; ++i) {
-				hash chain_id;
-				READ_BUF(chain_id.h, HASH_SIZE);
+                        hash prev_chain_id;
 
-				// IDs must be ordered to avoid duplicates
-				if (i && !(prev_chain_id < chain_id)) return __LINE__;
-				prev_chain_id = chain_id;
+                        for (uint64_t i = 0; i < mm_extra_data_count; ++i) {
+                                hash chain_id;
+                                READ_BUF(chain_id.h, HASH_SIZE);
 
-				uint64_t n;
-				READ_VARINT(n);
+                                // IDs must be ordered to avoid duplicates
+                                if (i && !(prev_chain_id < chain_id)) return __LINE__;
+                                prev_chain_id = chain_id;
 
-				// Sanity check
-				if (static_cast<uint64_t>(data_end - data) < n) return __LINE__;
+                                uint64_t n;
+                                READ_VARINT(n);
 
-				std::vector<uint8_t> t;
-				t.resize(n);
+                                // Sanity check
+                                if (static_cast<uint64_t>(data_end - data) < n) return __LINE__;
 
-				READ_BUF(t.data(), n);
+                                std::vector<uint8_t> t;
+                                t.resize(n);
 
-				m_mergeMiningExtra.emplace(chain_id, std::move(t));
-			}
-		}
+                                READ_BUF(t.data(), n);
 
-		READ_BUF(m_sidechainExtraBuf, sizeof(m_sidechainExtraBuf));
+                                m_mergeMiningExtra.emplace(chain_id, std::move(t));
+                        }
+                }
+
+                READ_BUF(m_sidechainExtraBuf, sizeof(m_sidechainExtraBuf));
 
 #undef READ_BYTE
 #undef EXPECT_BYTE
 #undef READ_VARINT
 #undef READ_BUF
 
-		if (data != data_end) {
-			return __LINE__;
-		}
+                if (data != data_end) {
+                        return __LINE__;
+                }
 
-		if ((num_outputs == 0) && !sidechain.get_outputs_blob(this, total_reward, outputs_blob, loop)) {
-			return __LINE__;
-		}
+                if ((num_outputs == 0) && !sidechain.get_outputs_blob(this, total_reward, outputs_blob, loop)) {
+                        return __LINE__;
+                }
 
-		if (static_cast<int>(outputs_blob.size()) != outputs_blob_size) {
-			return __LINE__;
-		}
+                if (static_cast<int>(outputs_blob.size()) != outputs_blob_size) {
+                        return __LINE__;
+                }
 
-		const uint8_t* transactions_blob = reinterpret_cast<uint8_t*>(transactions.data() + 1);
-
-#if POOL_BLOCK_DEBUG
-		memcpy(m_mainChainDataDebug.data() + outputs_offset, outputs_blob.data(), outputs_blob_size);
-		memcpy(m_mainChainDataDebug.data() + transactions_offset + outputs_blob_size_diff, transactions_blob, transactions_blob_size);
-#endif
-
-		hash check;
-		const std::vector<uint8_t>& consensus_id = sidechain.consensus_id();
-		const int data_size = static_cast<int>((data_end - data_begin) + outputs_blob_size_diff + transactions_blob_size_diff);
-
-		if (data_size > static_cast<int>(MAX_BLOCK_SIZE)) {
-			return __LINE__;
-		}
-
-		keccak_custom(
-			[nonce_offset, extra_nonce_offset, mm_root_hash_offset, data_begin, data_size, &consensus_id, &outputs_blob, outputs_blob_size_diff, outputs_offset, outputs_blob_size, transactions_blob, transactions_blob_size_diff, transactions_offset, transactions_blob_size](int offset) -> uint8_t
-			{
-				uint32_t k = static_cast<uint32_t>(offset - nonce_offset);
-				if (k < NONCE_SIZE) {
-					return 0;
-				}
-
-				k = static_cast<uint32_t>(offset - extra_nonce_offset);
-				if (k < EXTRA_NONCE_SIZE) {
-					return 0;
-				}
-
-				k = static_cast<uint32_t>(offset - mm_root_hash_offset);
-				if (k < HASH_SIZE) {
-					return 0;
-				}
-
-				if (offset < data_size) {
-					if (offset < outputs_offset) {
-						return data_begin[offset];
-					}
-					else if (offset < outputs_offset + outputs_blob_size) {
-						return outputs_blob[offset - outputs_offset];
-					}
-					else if (offset < transactions_offset + outputs_blob_size_diff) {
-						return data_begin[offset - outputs_blob_size_diff];
-					}
-					else if (offset < transactions_offset + outputs_blob_size_diff + transactions_blob_size) {
-						return transactions_blob[offset - (transactions_offset + outputs_blob_size_diff)];
-					}
-					return data_begin[offset - outputs_blob_size_diff - transactions_blob_size_diff];
-				}
-
-				return consensus_id[offset - data_size];
-			},
-			static_cast<int>(size + outputs_blob_size_diff + transactions_blob_size_diff + consensus_id.size()), check.h, HASH_SIZE);
-
-		if (m_sidechainId.empty()) {
-			m_sidechainId = check;
-		}
-		else if (m_sidechainId != check) {
-			return __LINE__;
-		}
+                const uint8_t* transactions_blob = reinterpret_cast<uint8_t*>(transactions.data() + 1);
 
 #if POOL_BLOCK_DEBUG
-		m_sideChainDataDebug.assign(sidechain_data_begin, data_end);
+                memcpy(m_mainChainDataDebug.data() + outputs_offset, outputs_blob.data(), outputs_blob_size);
+                memcpy(m_mainChainDataDebug.data() + transactions_offset + outputs_blob_size_diff, transactions_blob, transactions_blob_size);
 #endif
 
-		const uint32_t mm_aux_slot = get_aux_slot(sidechain.consensus_hash(), mm_nonce, mm_n_aux_chains);
+                hash check;
+                const std::vector<uint8_t>& consensus_id = sidechain.consensus_id();
+                const int data_size = static_cast<int>((data_end - data_begin) + outputs_blob_size_diff + transactions_blob_size_diff);
 
-		if (!verify_merkle_proof(check, m_merkleProof, mm_aux_slot, mm_n_aux_chains, m_merkleRoot)) {
-			return __LINE__;
-		}
-	}
-	catch (std::exception& e) {
-		LOGERR(0, "Exception in PoolBlock::deserialize(): " << e.what());
-		return __LINE__;
-	}
+                if (data_size > static_cast<int>(MAX_BLOCK_SIZE)) {
+                        return __LINE__;
+                }
 
-	reset_offchain_data();
-	return 0;
+                keccak_custom(
+                        [nonce_offset, extra_nonce_offset, mm_root_hash_offset, data_begin, data_size, &consensus_id, &outputs_blob, outputs_blob_size_diff, outputs_offset, outputs_blob_size, transactions_blob, transactions_blob_size_diff, transactions_offset, transactions_blob_size](int offset) -> uint8_t
+                        {
+                                uint32_t k = static_cast<uint32_t>(offset - nonce_offset);
+                                if (k < NONCE_SIZE) {
+                                        return 0;
+                                }
+
+                                k = static_cast<uint32_t>(offset - extra_nonce_offset);
+                                if (k < EXTRA_NONCE_SIZE) {
+                                        return 0;
+                                }
+
+                                k = static_cast<uint32_t>(offset - mm_root_hash_offset);
+                                if (k < HASH_SIZE) {
+                                        return 0;
+                                }
+
+                                if (offset < data_size) {
+                                        if (offset < outputs_offset) {
+                                                return data_begin[offset];
+                                        }
+                                        else if (offset < outputs_offset + outputs_blob_size) {
+                                                return outputs_blob[offset - outputs_offset];
+                                        }
+                                        else if (offset < transactions_offset + outputs_blob_size_diff) {
+                                                return data_begin[offset - outputs_blob_size_diff];
+                                        }
+                                        else if (offset < transactions_offset + outputs_blob_size_diff + transactions_blob_size) {
+                                                return transactions_blob[offset - (transactions_offset + outputs_blob_size_diff)];
+                                        }
+                                        return data_begin[offset - outputs_blob_size_diff - transactions_blob_size_diff];
+                                }
+
+                                return consensus_id[offset - data_size];
+                        },
+                        static_cast<int>(size + outputs_blob_size_diff + transactions_blob_size_diff + consensus_id.size()), check.h, HASH_SIZE);
+
+                if (m_sidechainId.empty()) {
+                        m_sidechainId = check;
+                }
+                else if (m_sidechainId != check) {
+                        return __LINE__;
+                }
+
+#if POOL_BLOCK_DEBUG
+                m_sideChainDataDebug.assign(sidechain_data_begin, data_end);
+#endif
+
+                const uint32_t mm_aux_slot = get_aux_slot(sidechain.consensus_hash(), mm_nonce, mm_n_aux_chains);
+
+                if (!verify_merkle_proof(check, m_merkleProof, mm_aux_slot, mm_n_aux_chains, m_merkleRoot)) {
+                        return __LINE__;
+                }
+        }
+        catch (std::exception& e) {
+                LOGERR(0, "Exception in PoolBlock::deserialize(): " << e.what());
+                return __LINE__;
+        }
+
+        reset_offchain_data();
+        return 0;
 }
 
 } // namespace p2pool
+

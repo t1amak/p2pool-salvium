@@ -165,7 +165,7 @@ typedef struct cmd {
 	cmdfunc *func;
 } cmd;
 
-static cmdfunc do_help, do_status, do_loglevel, do_addpeers, do_droppeers, do_showpeers, do_showworkers, do_showbans, do_showhosts, do_nexthost, do_outpeers, do_inpeers, do_donatetime, do_exit, do_version;
+static cmdfunc do_help, do_status, do_loglevel, do_addpeers, do_droppeers, do_showpeers, do_showworkers, do_showbans, do_unban, do_showhosts, do_nexthost, do_outpeers, do_inpeers, do_donatetime, do_exit, do_version;
 
 #ifdef WITH_RANDOMX
 static cmdfunc do_start_mining, do_stop_mining;
@@ -180,6 +180,7 @@ static cmd cmds[] = {
 	{ STRCONST("peers"), "", "show all peers", do_showpeers },
 	{ STRCONST("workers"), "", "show all connected workers", do_showworkers },
 	{ STRCONST("bans"), "", "show all banned IPs", do_showbans },
+        { STRCONST("unban"), "[IP]", "unban peer (or all if no IP given)", do_unban },
 	{ STRCONST("hosts"), "", "show Monero hosts", do_showhosts },
 	{ STRCONST("next_host"), "", "switch to the next Monero host", do_nexthost },
 	{ STRCONST("outpeers"), "<N>", "set maximum number of outgoing connections", do_outpeers },
@@ -349,6 +350,16 @@ static void do_showbans(p2pool* m_pool, const char* /* args */)
 	}
 }
 
+static void do_unban(p2pool* m_pool, const char* /* args */)
+{
+    if (m_pool->stratum_server()) {
+        m_pool->stratum_server()->clear_bans();
+    }
+    if (m_pool->p2p_server()) {
+        m_pool->p2p_server()->clear_bans();
+    }
+}
+
 // cppcheck-suppress constParameterCallback
 static void do_showhosts(p2pool* m_pool, const char* /* args */)
 {
@@ -516,3 +527,4 @@ ConsoleCommands::~ConsoleCommands()
 }
 
 } // namespace p2pool
+

@@ -41,6 +41,7 @@ public:
 	void drop_connections_async() { if (m_finished.load() == 0) { uv_async_send(&m_dropConnectionsAsync); } }
 	void shutdown_tcp();
 	virtual void print_status();
+        virtual void clear_bans();
 
 	[[nodiscard]] uv_loop_t* get_loop() { return &m_loop; }
 

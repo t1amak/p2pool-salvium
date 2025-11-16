@@ -571,6 +571,14 @@ void TCPServer::print_bans()
 	}
 }
 
+void TCPServer::clear_bans()
+{
+    MutexLock lock(m_bansLock);
+    size_t count = m_bans.size();
+    m_bans.clear();
+    LOGINFO(0, "cleared " << count << " banned IPs");
+}
+
 bool TCPServer::send_internal(Client* client, const Callback<size_t, uint8_t*, size_t>::Base& callback, bool raw)
 {
 	check_event_loop_thread(__func__);

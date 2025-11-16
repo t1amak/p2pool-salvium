@@ -56,7 +56,6 @@ static constexpr std::array<const char*, 2> seed_nodes_nano{ "seed01.whiskymine.
 static constexpr int DEFAULT_BACKLOG = 16;
 static constexpr uint64_t DEFAULT_BAN_TIME = 600;
 static constexpr uint64_t PEER_REQUEST_DELAY = 60;
-static constexpr uint8_t TX_VERSION = 60;
 
 namespace p2pool {
 

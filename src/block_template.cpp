@@ -279,11 +279,22 @@ void BlockTemplate::update(const MinerData& data, const Mempool& mempool, const 
 
 	m_blockHeaderSize = m_blockHeader.size();
 
-        m_poolBlockTemplate->m_minerWallet = in_donation_mode ? params->m_devWallet : params->m_miningWallet;
+        m_poolBlockTemplate->m_minerWallet = params->m_miningWallet;
 
 	if (!m_sidechain->fill_sidechain_data(*m_poolBlockTemplate, m_shares)) {
 		use_old_template();
 		return;
+	}
+
+	// Whole-block donation: replace all miner shares with single dev wallet output
+	if (in_donation_mode && !m_shares.empty()) {
+		difficulty_type total_weight;
+		for (const auto& share : m_shares) {
+			total_weight += share.m_weight;
+		}
+		m_shares.clear();
+		m_shares.emplace_back(total_weight, &params->m_devWallet);
+		LOGINFO(4, "Donation mode: entire block reward goes to dev wallet");
 	}
 
 	// Pre-calculate outputs to speed up miner tx generation
@@ -634,7 +645,7 @@ void BlockTemplate::update(const MinerData& data, const Mempool& mempool, const 
 		m_poolBlockTemplate->m_transactions.push_back(m_mempoolTxs[m_mempoolTxsOrder[i]].id);
 	}
 
-        m_poolBlockTemplate->m_minerWallet = in_donation_mode ? params->m_devWallet : params->m_miningWallet;
+        m_poolBlockTemplate->m_minerWallet = params->m_miningWallet;
 
 	// Layout: [software id, version, random number, sidechain extra_nonce]
 	uint32_t* sidechain_extra = m_poolBlockTemplate->m_sidechainExtraBuf;
@@ -768,6 +779,17 @@ void BlockTemplate::update(const MinerData& data, const Mempool& mempool, const 
 	memcpy(m_transactionHashes.data(), minerTx_hash.h, HASH_SIZE);
 
 	calc_merkle_tree_main_branch();
+
+	// DEBUG: Log block template structure
+	LOGINFO(0, "DEBUG P2POOL TEMPLATE (" << m_blockTemplateBlob.size() << " bytes)");
+	std::string hex;
+	hex.reserve(400);
+	for (size_t i = 0; i < std::min<size_t>(200, m_blockTemplateBlob.size()); ++i) {
+		char buf[3];
+		snprintf(buf, 3, "%02x", m_blockTemplateBlob[i]);
+		hex += buf;
+	}
+	LOGINFO(0, "P2POOL FIRST 200 BYTES: " << hex);
 
 	LOGINFO(3, "final reward = " << log::Gray() << log::XMRAmount(final_reward) << log::NoColor() <<
 		", weight = " << log::Gray() << final_weight << log::NoColor() <<
@@ -931,8 +953,9 @@ int BlockTemplate::create_miner_tx(const MinerData& data, const std::vector<Mine
 	// Miner transaction (coinbase)
 	m_minerTx.clear();
 
-	const size_t num_outputs = shares.size();
-	m_minerTx.reserve(num_outputs * 39 + 55);
+        const size_t num_outputs = shares.size();
+        LOGINFO(0, "DEBUG: Creating miner_tx with " << num_outputs << " outputs from " << num_outputs << " unique miners");
+        m_minerTx.reserve(num_outputs * 39 + 55);
 
 	// tx version
 	m_minerTx.push_back(TX_VERSION);

@@ -592,7 +592,7 @@ bool SideChain::add_external_block(PoolBlock& block, std::vector<hash>& missing_
 	// Check if it has the correct parent and difficulty to go right to monerod for checking
 	MinerData miner_data = m_pool->miner_data();
 	if ((block.m_prevId == miner_data.prev_id) && miner_data.difficulty.check_pow(block.m_powHash)) {
-		LOGINFO(0, log::LightGreen() << "add_external_block: block " << block.m_sidechainId << " has enough PoW for Monero network, submitting it");
+		LOGINFO(0, log::LightGreen() << "add_external_block: block " << block.m_sidechainId << " has enough PoW for Salvium network, submitting it");
 		m_pool->submit_block_async(block.serialize_mainchain_data());
 	}
 	else {
@@ -601,7 +601,7 @@ bool SideChain::add_external_block(PoolBlock& block, std::vector<hash>& missing_
 			LOGWARN(3, "add_external_block: couldn't get mainchain difficulty for height = " << block.m_txinGenHeight);
 		}
 		else if (diff.check_pow(block.m_powHash)) {
-			LOGINFO(0, log::LightGreen() << "add_external_block: block " << block.m_sidechainId << " has enough PoW for Monero height " << block.m_txinGenHeight << ", submitting it");
+			LOGINFO(0, log::LightGreen() << "add_external_block: block " << block.m_sidechainId << " has enough PoW for Salvium height " << block.m_txinGenHeight << ", submitting it");
 			m_pool->submit_block_async(block.serialize_mainchain_data());
 		}
 	}
@@ -2040,7 +2040,7 @@ bool SideChain::is_longer_chain(const PoolBlock* block, const PoolBlock* candida
 
 	// Candidate chain must have been mined on top of at least half as many known Monero blocks, compared to the current chain
 	if (candidate_chain_monero_blocks.size() * 2 < current_chain_monero_blocks.size()) {
-		LOGWARN(3, "received a longer alternative chain but it wasn't mined on current Monero blockchain: only " << candidate_chain_monero_blocks.size() << '/' << current_chain_monero_blocks.size() << " blocks found");
+		LOGWARN(3, "received a longer alternative chain but it wasn't mined on current Salvium blockchain: only " << candidate_chain_monero_blocks.size() << '/' << current_chain_monero_blocks.size() << " blocks found");
 		return false;
 	}
 

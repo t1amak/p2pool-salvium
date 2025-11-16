@@ -1139,32 +1139,33 @@ void p2pool::submit_block() const
 
 	bool is_external = false;
 
-	if (submit_data.blob.empty()) {
-		submit_data.blob = m_blockTemplate->get_block_template_blob(submit_data.template_id, submit_data.extra_nonce, nonce_offset, extra_nonce_offset, merkle_root_offset, merge_mining_root, &block_tpl);
-
-		LOGINFO(0, log::LightGreen() << "submit_block: height = " << height
-			<< ", template id = " << submit_data.template_id
-			<< ", nonce = " << submit_data.nonce
-			<< ", extra_nonce = " << submit_data.extra_nonce
-			<< ", mm_root = " << merge_mining_root);
-
-		if (submit_data.blob.empty()) {
-			LOGERR(0, "submit_block: couldn't find block template with id " << submit_data.template_id);
-			return;
-		}
-	}
-	else {
-		LOGINFO(0, log::LightGreen() << "submit_block: height = " << height << ", external blob (" << submit_data.blob.size() << " bytes)");
-                std::string hex;
-                hex.reserve(submit_data.blob.size() * 2);
-                for (size_t i = 0; i < std::min<size_t>(submit_data.blob.size(), 400); ++i) {
-                        char buf[3];
-                        snprintf(buf, sizeof(buf), "%02x", submit_data.blob[i]);
-                        hex.append(buf);
-                }
-                LOGINFO(0, "BLOB HEX (first 400 bytes): " << hex);
-		is_external = true;
-	}
+        if (submit_data.blob.empty()) {
+        	submit_data.blob = m_blockTemplate->get_block_template_blob(submit_data.template_id, submit_data.extra_nonce, nonce_offset, extra_nonce_offset, merkle_root_offset, merge_mining_root, &block_tpl);
+        	LOGINFO(0, log::LightGreen() << "submit_block: height = " << height
+        		<< ", template id = " << submit_data.template_id
+        		<< ", nonce = " << submit_data.nonce
+        		<< ", extra_nonce = " << submit_data.extra_nonce
+        		<< ", mm_root = " << merge_mining_root);
+	
+        	// DEBUG: Log what we're submitting
+        	std::string hex;
+        	hex.reserve(submit_data.blob.size() * 2);
+        	for (size_t i = 0; i < submit_data.blob.size(); ++i) {
+        		char buf[3];
+        		snprintf(buf, sizeof(buf), "%02x", submit_data.blob[i]);
+        		hex.append(buf);
+        	}
+        	LOGINFO(0, "DEBUG BLOCK BLOB: " << hex);
+	
+        	if (submit_data.blob.empty()) {
+        		LOGERR(0, "submit_block: couldn't find block template with id " << submit_data.template_id);
+        		return;
+        	}
+        }
+        else {
+        	LOGINFO(0, log::LightGreen() << "submit_block: height = " << height << ", external blob");
+        	is_external = true;
+        }
 
 	std::string request;
 	request.reserve(submit_data.blob.size() * 2 + 128);

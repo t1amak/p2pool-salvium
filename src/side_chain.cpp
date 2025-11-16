@@ -121,9 +121,9 @@ SideChain::SideChain(p2pool* pool, NetworkType type, const char* pool_name)
 	  << m_chainWindowSize << '\0'
 	  << m_unclePenalty    << '\0';
 
-	constexpr char default_config[] = "mainnet\0" "default\0" "\0" "10\0" "100000\0" "2160\0" "20\0";
-	constexpr char mini_config[] = "mainnet\0" "mini\0" "\0" "10\0" "100000\0" "2160\0" "20\0";
-	constexpr char nano_config[] = "mainnet\0" "nano\0" "\0" "30\0" "100000\0" "2160\0" "10\0";
+        constexpr char default_config[] = "salvium_main\0" "salvium_main\0" "\0" "10\0" "100000\0" "2160\0" "20\0";
+        constexpr char mini_config[] = "salvium_mini\0" "salvium_mini\0" "\0" "10\0" "100000\0" "2160\0" "20\0";
+        constexpr char nano_config[] = "salvium_nano\0" "salvium_nano\0" "\0" "30\0" "100000\0" "2160\0" "10\0";
 
 	// Hardcoded default consensus ID
 	if ((s.m_pos == sizeof(default_config) - 1) && (memcmp(buf, default_config, sizeof(default_config) - 1) == 0)) {

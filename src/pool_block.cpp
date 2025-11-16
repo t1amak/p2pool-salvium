@@ -228,6 +228,31 @@ std::vector<uint8_t> PoolBlock::serialize_mainchain_data(size_t* header_size, si
 		*miner_tx_size = data.size() - header_size0;
 	}
 
+        // Protocol tx (Salvium Carrot v1+)
+        if (m_majorVersion >= 10) {
+                writeVarint(4, data);  // version = TRANSACTION_VERSION_CARROT
+                writeVarint(60, data);  // unlock_time = 60
+                
+                // vin (1 txin_gen)
+                writeVarint(1, data);  // vin.size() = 1
+                data.push_back(TXIN_GEN);
+                writeVarint(m_txinGenHeight, data);
+                
+                // vout (empty)
+                writeVarint(0, data);  // vout.size() = 0
+                
+                // extra (2 bytes: 0x02 0x00)
+                writeVarint(2, data);  // extra.size() = 2
+                data.push_back(0x02);
+                data.push_back(0x00);
+                
+                // type = PROTOCOL
+                writeVarint(2, data);  // transaction_type::PROTOCOL = 2
+                
+                // rct_signatures (null)
+                data.push_back(0);  // RCTTypeNull
+        }
+
 	writeVarint(m_transactions.size() - 1, data);
 
 #ifdef WITH_INDEXED_HASHES

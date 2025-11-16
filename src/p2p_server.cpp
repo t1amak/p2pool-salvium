@@ -43,14 +43,15 @@
 
 #include <fstream>
 #include <numeric>
+#include <array>
 
 LOG_CATEGORY(P2PServer)
 
 static constexpr char saved_peer_list_file_name[] = "p2pool_peers.txt";
 static constexpr char saved_onion_peer_list_file_name[] = "p2pool_onion_peers.txt";
-static const char* seed_nodes[] = { "seed01.whiskymine.io", "seed02.whiskymine.io", nullptr };
-static const char* seed_nodes_mini[] = { "seed01.whiskymine.io", "seed02.whiskymine.io", nullptr };
-static const char* seed_nodes_nano[] = { "seed01.whiskymine.io", "seed02.whiskymine.io", nullptr };
+static constexpr std::array<const char*, 2> seed_nodes{ "seed01.whiskymine.io", "seed02.whiskymine.io" };
+static constexpr std::array<const char*, 2> seed_nodes_mini{ "seed01.whiskymine.io", "seed02.whiskymine.io" };
+static constexpr std::array<const char*, 2> seed_nodes_nano{ "seed01.whiskymine.io", "seed02.whiskymine.io" };
 
 static constexpr int DEFAULT_BACKLOG = 16;
 static constexpr uint64_t DEFAULT_BAN_TIME = 600;
@@ -641,10 +642,9 @@ void P2PServer::load_peer_list()
 	std::string saved_list;
 
 	// Load peers from seed nodes if we're on the default or mini sidechain
-	auto load_from_seed_nodes = [&saved_list](const char** nodes, int p2p_port) {
-		for (size_t i = 0; nodes[i]; ++i) {
-			const char* cur_node = nodes[i];
-			if (!cur_node[0]) {
+	auto load_from_seed_nodes = [&saved_list](const auto& nodes, int p2p_port) {
+		for (const char* cur_node : nodes) {
+			if (!cur_node || !cur_node[0]) {
 				continue;
 			}
 			LOGINFO(4, "loading peers from " << cur_node);

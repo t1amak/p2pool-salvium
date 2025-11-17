@@ -92,15 +92,6 @@ Params::Params(int argc, char* const argv[])
 			ok = true;
 		}
 
-		if ((strcmp(argv[i], "--donate-time") == 0) && (i + 1 < argc)) {
-			m_donateLevel = static_cast<uint32_t>(atoi(argv[++i]));
-			if (m_donateLevel < 1 || m_donateLevel > 50) {
-				LOGERR(1, "Invalid donate level " << m_donateLevel << ", must be 1-50");
-				m_donateLevel = 1;
-			}
-			ok = true;
-		}
-
 		if ((strcmp(argv[i], "--stratum") == 0) && (i + 1 < argc)) {
 			m_stratumAddresses = argv[++i];
 			ok = true;

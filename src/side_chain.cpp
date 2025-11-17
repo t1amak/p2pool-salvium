@@ -61,11 +61,12 @@ static constexpr uint8_t nano_consensus_id[HASH_SIZE] = { 83,65,76,78,210,226,11
 
 NetworkType SideChain::s_networkType = NetworkType::Invalid;
 
-SideChain::SideChain(p2pool* pool, NetworkType type, const char* pool_name)
+SideChain::SideChain(p2pool* pool, NetworkType type, const char* pool_name, const Wallet* dev_wallet)
 	: m_pool(pool)
 	, m_chainTip{ nullptr }
 	, m_seenWalletsLastPruneTime(0)
-	, m_poolName(pool_name ? pool_name : "default")
+	, m_poolName(pool_name ? pool_name : "salvium_main")
+        , m_devWallet(dev_wallet)
 	, m_targetBlockTime(10)
 	, m_minDifficulty(MIN_DIFFICULTY, 0)
 	, m_chainWindowSize(2160)
@@ -864,6 +865,24 @@ bool SideChain::get_outputs_blob(PoolBlock* block, uint64_t total_reward, std::v
 		if (!get_shares(block, data->tmpShares) || !split_reward(total_reward, data->tmpShares, tmpRewards) || (tmpRewards.size() != data->tmpShares.size())) {
 			return false;
 		}
+                // Handle donation mode during validation - match block creation logic
+                const uint64_t block_height = block->m_sidechainHeight;
+                if ((block_height % 100) == 0 && m_devWallet) {
+                	// This is a donation block - replace all shares with single dev wallet output
+                	difficulty_type total_weight;
+                	for (const auto& share : data->tmpShares) {
+                		total_weight += share.m_weight;
+                	}
+                	data->tmpShares.clear();
+                	data->tmpShares.emplace_back(total_weight, m_devWallet);
+	
+                	// Recalculate rewards for the single dev wallet output
+                	tmpRewards.clear();
+                	if (!split_reward(total_reward, data->tmpShares, tmpRewards)) {
+                		return false;
+                	}
+                }
+
 	}
 
 	const size_t n = data->tmpShares.size();
@@ -1751,6 +1770,16 @@ void SideChain::verify(PoolBlock* block)
 		block->m_invalid = true;
 		return;
 	}
+
+        // Handle donation mode during verification - match block creation logic
+        if ((block->m_sidechainHeight % 100) == 0 && m_devWallet) {
+        	difficulty_type total_weight;
+        	for (const auto& share : shares) {
+        		total_weight += share.m_weight;
+        	}
+        	shares.clear();
+        	shares.emplace_back(total_weight, m_devWallet);
+        }
 
 	if (shares.size() != block->m_outputAmounts.size()) {
 		LOGWARN(3, "block at height = " << block->m_sidechainHeight <<

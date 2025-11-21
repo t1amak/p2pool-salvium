@@ -40,7 +40,7 @@ struct MinerShare
 class SideChain : public nocopy_nomove
 {
 public:
-	SideChain(p2pool* pool, NetworkType type, const char* pool_name = nullptr);
+        SideChain(p2pool* pool, NetworkType type, const char* pool_name = nullptr, const Wallet* dev_wallet = nullptr);
 	~SideChain();
 
 	[[nodiscard]] bool fill_sidechain_data(PoolBlock& block, std::vector<MinerShare>& shares) const;
@@ -138,6 +138,7 @@ private:
 	std::vector<DifficultyData> m_difficultyData;
 
 	std::string m_poolName;
+        const Wallet* m_devWallet;
 	std::string m_poolPassword;
 	uint64_t m_targetBlockTime;
 	difficulty_type m_minDifficulty;

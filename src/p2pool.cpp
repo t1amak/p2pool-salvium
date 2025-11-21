@@ -71,8 +71,6 @@ p2pool::p2pool(int argc, char* argv[])
 	, m_zmqLastActive(0)
 	, m_startTime(seconds_since_epoch())
 	, m_lastMinerDataReceived(0)
-        , m_donationCycleStart(std::chrono::steady_clock::now())
-        , m_inDonationMode(false)
 {
 	LOGINFO(1, log::LightCyan() << VERSION);
 
@@ -206,7 +204,7 @@ p2pool::p2pool(int argc, char* argv[])
 		throw std::exception();
 	}
 
-	m_sideChain = new SideChain(this, type, p->m_mini ? "mini" : (p->m_nano ? "nano" : nullptr));
+        m_sideChain = new SideChain(this, type, p->m_mini ? "mini" : (p->m_nano ? "nano" : nullptr), &p->m_devWallet);
 
 	const int p2p_port = m_sideChain->is_mini() ? DEFAULT_P2P_PORT_MINI : (m_sideChain->is_nano() ? DEFAULT_P2P_PORT_NANO : DEFAULT_P2P_PORT);
 
@@ -355,40 +353,18 @@ void p2pool::print_hosts() const
 
 bool p2pool::in_donation_mode()
 {
-	using namespace std::chrono;
-	
-	const auto now = steady_clock::now();
-	const auto elapsed = duration_cast<minutes>(now - m_donationCycleStart);
-	
-	const uint32_t cycle_minutes = 100;
-	const uint32_t donate_minutes = m_params->m_donateLevel;
-	const uint32_t normal_minutes = cycle_minutes - donate_minutes;
-	
-	// Check if we need to start a new cycle
-	if (elapsed >= minutes(cycle_minutes)) {
-		// Log completion if we were in donation mode when cycle ended
-		if (m_inDonationMode) {
-			LOGINFO(0, log::LightCyan() << "Dev donation cycle complete");
-		}
-		m_donationCycleStart = now;
-		m_inDonationMode = false;
+	const PoolBlock* tip = m_sideChain->chainTip();
+	if (!tip) {
 		return false;
 	}
 	
-	// Check if we should be in donation mode
-	const bool should_donate = (elapsed >= minutes(normal_minutes));
+	// Check the NEXT block height (the one being created), not current tip
+	const uint64_t next_height = tip->m_sidechainHeight + 1;
 	
-	// Log transitions
-	if (should_donate && !m_inDonationMode) {
-		m_inDonationMode = true;
-		LOGINFO(0, log::LightCyan() << "Entering dev donation mode for " << log::LightGreen() << donate_minutes << log::LightCyan() << " minute(s)");
-	}
-	else if (!should_donate && m_inDonationMode) {
-		m_inDonationMode = false;
-		LOGINFO(0, log::LightCyan() << "Dev donation cycle complete");
-	}
+	// Donate every 100th block (blocks 100, 200, 300, etc.)
+	const uint64_t cycle_length = 100;
 	
-	return m_inDonationMode;
+	return (next_height % cycle_length) == 0;
 }
 
 bool p2pool::calculate_hash(const void* data, size_t size, uint64_t height, const hash& seed, hash& result, bool force_light_mode)

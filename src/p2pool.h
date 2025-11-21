@@ -293,10 +293,6 @@ private:
 
 	std::atomic<uint64_t> m_lastMinerDataReceived;
 
-	// Dev donation tracking
-	std::chrono::steady_clock::time_point m_donationCycleStart;
-	bool m_inDonationMode = false;
-
 	uv_timer_t m_timer;
 };
 
